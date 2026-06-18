@@ -1,0 +1,26 @@
+poc_public_url = "http://localhost:8000"
+poc_af_id = "VehicleCrashDetectionPoC"
+log_level = "INFO"
+
+[net_apis]
+api = "camara"
+auth_mode = "other"
+
+[camara]
+# not protected when net_apis.auth_mode = "other"
+url = "http://localhost:8080"
+
+[nef]
+# username and password required when net_apis.auth_mode = "other"
+url = "http://localhost:8080"
+username = "username"
+password = "password"
+
+[capif_sdk]
+capif_username = "username"
+capif_password = "password"
+
+[analytics]
+offset_period = -5
+temporal_gran_size = 5
+rep_period = 5
