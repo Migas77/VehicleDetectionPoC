@@ -9,7 +9,7 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
-from app.schemas.poc.qos_profile import QosProfile
+from app.schemas.qos_profile import QosProfile
 
 
 LogLevel = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
@@ -36,13 +36,30 @@ class CapifSdkSettings(BaseModel):
 
 
 class CamerasSettings(BaseModel):
-    default_qos_profile: QosProfile  # required fallback for unconfigured camera UEs
-    qos_profiles: dict[int, QosProfile] = Field(
-        default_factory=dict
-    )  # Per-camera QoS overrides
+    qos_profiles: dict[str, QosProfile]  # {profile_name : QosProfile}
+    qos_profiles_assignment: dict[
+        str, str
+    ]  # {"default" / str(NEF UE db id) : profile_name}
+
+    @model_validator(mode="after")
+    def _validate_qos_profile_assignments(self) -> "CamerasSettings":
+        if "default" not in self.qos_profiles_assignment:
+            raise ValueError("qos_profiles_assignment must contain a 'default' key")
+        for key, name in self.qos_profiles_assignment.items():
+            if name not in self.qos_profiles:
+                raise ValueError(
+                    f"qos_profiles_assignment['{key}'] references unknown profile '{name}'. "
+                    f"Valid names: {sorted(self.qos_profiles)}"
+                )
+        return self
+
+    @property
+    def default_qos_profile(self) -> QosProfile:
+        return self.qos_profiles[self.qos_profiles_assignment["default"]]
 
     def get_by_ue_id(self, ue_id: int) -> QosProfile | None:
-        return self.qos_profiles.get(ue_id)
+        name = self.qos_profiles_assignment.get(str(ue_id), "default")
+        return self.qos_profiles[name]  # validator guarantees name exists
 
 
 class AnalyticsSettings(BaseModel):
@@ -60,6 +77,7 @@ class AnalyticsSettings(BaseModel):
 class Settings(BaseSettings):
     model_config = SettingsConfigDict(toml_file=["config.toml", "qos.toml"])
 
+    poc_title: str
     poc_public_url: AnyHttpUrl
     poc_af_id: str
     log_level: LogLevel = "INFO"

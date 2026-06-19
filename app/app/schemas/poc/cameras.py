@@ -3,7 +3,7 @@ from typing import Annotated, Any
 
 from pydantic import Field, model_validator
 
-from app.schemas.poc.qos_profile import QosProfile
+from app.schemas.qos_profile import QosProfile
 from app.schemas.poc.ue import UE
 from app.settings import settings
 
@@ -25,7 +25,7 @@ class CameraUE(UE):
             )
             if profile is None:
                 LOG.warning(
-                    "No QoS profile configured for UE id=%s, using default", ue_id
+                    "No QoS profile assignment for UE id=%s, using default", ue_id
                 )
                 profile = settings.cameras.default_qos_profile
             data = {**data, "qos_profile": profile.model_dump()}

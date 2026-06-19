@@ -1,9 +1,4 @@
-from typing import Annotated
+from app.schemas.error_info import ErrorInfo
+from app.schemas.qos_profile import QosProfile
 
-from pydantic import BaseModel, Field
-
-
-class ErrorInfo(BaseModel):
-    status: Annotated[int, Field(description="HTTP response status code")]
-    code: Annotated[str, Field(description="Code given to this error")]
-    message: Annotated[str, Field(description="Detailed error description")]
+__all__ = ["ErrorInfo", "QosProfile"]
