@@ -9,6 +9,8 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
+from app.schemas.poc.qos_profile import QosProfile
+
 
 LogLevel = Literal["CRITICAL", "ERROR", "WARNING", "INFO", "DEBUG"]
 
@@ -33,6 +35,16 @@ class CapifSdkSettings(BaseModel):
     capif_password: str
 
 
+class CamerasSettings(BaseModel):
+    default_qos_profile: QosProfile  # required fallback for unconfigured camera UEs
+    qos_profiles: dict[int, QosProfile] = Field(
+        default_factory=dict
+    )  # Per-camera QoS overrides
+
+    def get_by_ue_id(self, ue_id: int) -> QosProfile | None:
+        return self.qos_profiles.get(ue_id)
+
+
 class AnalyticsSettings(BaseModel):
     offset_period: Annotated[int, Field(le=-1)]  # negative (historic data) - in seconds
     temporal_gran_size: Annotated[int, Field(ge=1)]  # in seconds
@@ -46,7 +58,7 @@ class AnalyticsSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(toml_file="config.toml")
+    model_config = SettingsConfigDict(toml_file=["config.toml", "qos.toml"])
 
     poc_public_url: AnyHttpUrl
     poc_af_id: str
@@ -57,6 +69,7 @@ class Settings(BaseSettings):
     camara: CamaraSettings | None = None
     capif_sdk: CapifSdkSettings | None = None
     analytics: AnalyticsSettings
+    cameras: CamerasSettings
 
     @model_validator(mode="after")
     def validate_required_sections(self) -> "Settings":

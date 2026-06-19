@@ -2,7 +2,7 @@ from enum import Enum
 from typing import Annotated, Any, Dict, List, Literal, Optional, Union
 from datetime import datetime
 
-from pydantic import AnyUrl, BaseModel, Field, AnyHttpUrl, ConfigDict, PrivateAttr
+from pydantic import AnyUrl, BaseModel, Field, AnyHttpUrl
 
 
 class SubscriptionStatus(str, Enum):

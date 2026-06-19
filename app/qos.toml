@@ -1,0 +1,10 @@
+[cameras.default_qos_profile]
+ul_bitrate       = "10 Mbps"
+dl_bitrate       = "50 Mbps"
+qos_profile_name = "default-camera-profile"
+
+# Per-camera QoS overrides keyed by NEF UE database id.
+# Based on nef_db_init.sh creation order: scamera-1 = id 6, dcamera-1 = id 7.
+[cameras.qos_profiles]
+6 = {ul_bitrate = "10 Mbps", dl_bitrate = "50 Mbps", qos_profile_name = "4k-stream-profile"}
+7 = {ul_bitrate = "10 Mbps", dl_bitrate = "50 Mbps", qos_profile_name = "4k-stream-profile"}
