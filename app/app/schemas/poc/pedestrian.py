@@ -5,5 +5,5 @@ from pydantic import Field
 from app.schemas.poc.ue import UE
 
 
-class Pedestrian(UE):
+class PedestrianUE(UE):
     name: Annotated[str, Field(pattern=r"^pedestrian-")]

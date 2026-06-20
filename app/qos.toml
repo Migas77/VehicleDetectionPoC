@@ -1,9 +1,10 @@
 [cameras.qos_profiles]
-default-camera-profile = {ul_bitrate = "10 Mbps", dl_bitrate = "50 Mbps", qos_profile_name = "default-camera-profile"}
-4k-stream-profile      = {ul_bitrate = "10 Mbps", dl_bitrate = "50 Mbps", qos_profile_name = "4k-stream-profile"}
+QCI_1_voice = {ul_bitrate = "100 Kbps", dl_bitrate = "100 Kbps", qos_profile_name = "QCI_1_voice"}
+QCI_2_voice = {ul_bitrate = "400 Kbps", dl_bitrate = "400 Kbps", qos_profile_name = "QCI_2_voice"}
 
 [cameras.qos_profiles_assignment]
-default = "default-camera-profile"
-6       = "4k-stream-profile"
-7       = "4k-stream-profile"
+# Apart from default profile, the keys follow the initialization order in nef_db_init.sh
+default = "QCI_1_voice"
+1       = "QCI_2_voice"
+2       = "QCI_2_voice"
 

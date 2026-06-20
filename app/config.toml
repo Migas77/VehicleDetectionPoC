@@ -4,18 +4,18 @@ poc_af_id = "VehicleCrashDetectionPoC"
 log_level = "INFO"
 
 [net_apis]
-api = "camara"
+api = "nef"
 auth_mode = "other"
 
 [camara]
 # not protected when net_apis.auth_mode = "other"
-url = "http://localhost:8080"
+url = "http://localhost:8000"
 
 [nef]
 # username and password required when net_apis.auth_mode = "other"
-url = "http://localhost:8080"
-username = "username"
-password = "password"
+url = "http://localhost:8888"
+username = "admin@my-email.com"
+password = "pass"
 
 [capif_sdk]
 capif_username = "username"

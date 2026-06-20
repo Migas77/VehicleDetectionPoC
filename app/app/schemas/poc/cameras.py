@@ -3,20 +3,17 @@ from typing import Annotated, Any
 
 from pydantic import Field, model_validator
 
-from app.schemas.qos_profile import QosProfile
-from app.schemas.poc.ue import UE
+from app.schemas.poc.ue_with_qos import UeWithQoS
 from app.settings import settings
 
 LOG = logging.getLogger(__name__)
 
 
-class CameraUE(UE):
+class CameraUE(UeWithQoS):
     """Base for camera UEs — injects QoS profile from settings at deserialization time."""
 
-    qos_profile: QosProfile
-
-    @classmethod
     @model_validator(mode="before")
+    @classmethod
     def _inject_qos_profile(cls, data: Any) -> Any:
         if isinstance(data, dict) and "qos_profile" not in data:
             ue_id: int | None = data.get("id")
@@ -29,12 +26,13 @@ class CameraUE(UE):
                 )
                 profile = settings.cameras.default_qos_profile
             data = {**data, "qos_profile": profile.model_dump()}
-        return data
+            return data
+        raise ValueError("CameraUE deserialization expects a dict")
 
 
-class StaticCamera(CameraUE):
+class StaticCameraUE(CameraUE):
     name: Annotated[str, Field(pattern=r"^scamera-")]
 
 
-class DynamicCamera(CameraUE):
+class DynamicCameraUE(CameraUE):
     name: Annotated[str, Field(pattern=r"^dcamera-")]

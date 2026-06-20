@@ -1,6 +1,8 @@
 import logging
 from typing import Annotated, Literal
 
+import httpx
+
 from pydantic import AnyHttpUrl, BaseModel, Field, model_validator
 from pydantic_settings import (
     BaseSettings,
@@ -58,7 +60,9 @@ class CamerasSettings(BaseModel):
         return self.qos_profiles[self.qos_profiles_assignment["default"]]
 
     def get_by_ue_id(self, ue_id: int) -> QosProfile | None:
-        name = self.qos_profiles_assignment.get(str(ue_id), "default")
+        name = self.qos_profiles_assignment.get(str(ue_id))
+        if name is None:
+            return None
         return self.qos_profiles[name]  # validator guarantees name exists
 
 
@@ -113,6 +117,42 @@ class Settings(BaseSettings):
             )
 
         return self
+
+    def create_nef_client(self) -> httpx.AsyncClient:
+        """Return a plain AsyncClient for the NEF (no auth)."""
+        return httpx.AsyncClient(base_url=str(self.nef.url).rstrip("/"))
+
+    def create_nef_auth_client(self) -> httpx.AsyncClient:
+        """Return an AsyncClient for the NEF with JWT bearer auth.
+
+        Settings validator guarantees username/password are set when auth_mode='other'.
+        """
+        from app.drivers.nef_auth import NEFJwtAuth  # deferred — avoids circular import
+
+        nef_url = str(self.nef.url).rstrip("/")
+        if self.net_apis.auth_mode == "other":
+            auth: httpx.Auth = NEFJwtAuth(
+                nef_url,
+                self.nef.username,  # type: ignore[arg-type]  # guaranteed by validator
+                self.nef.password,  # type: ignore[arg-type]
+            )
+        else:
+            raise NotImplementedError(
+                f"NEF auth_mode '{self.net_apis.auth_mode}' is not yet implemented"
+            )
+        return httpx.AsyncClient(base_url=nef_url, auth=auth)
+
+    def create_camara_client(self) -> httpx.AsyncClient:
+        """Return an AsyncClient for the CAMARA gateway.
+
+        Settings validator guarantees camara is not None when net_apis.api='camara'.
+        """
+        if self.camara is None:
+            raise RuntimeError(
+                "[camara] settings required — ensure net_apis.api = 'camara' and "
+                "[camara] section is present in config.toml"
+            )
+        return httpx.AsyncClient(base_url=str(self.camara.url).rstrip("/"))
 
     @classmethod
     def settings_customise_sources(
