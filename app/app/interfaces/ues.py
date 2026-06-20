@@ -24,3 +24,11 @@ class UEsInterface(ABC):
     @abstractmethod
     async def get_poc_ues_by_type(self) -> PocUEsByType:
         """Return PocUEs grouped by UE type (car, static camera, dynamic camera, pedestrian)."""
+
+    @abstractmethod
+    async def start_movement(self, supi: str) -> bool:
+        """Start the movement loop for the UE with the given SUPI. Returns True on success."""
+
+    @abstractmethod
+    async def stop_movement(self, supi: str) -> bool:
+        """Stop the movement loop for the UE with the given SUPI. Returns True on success."""

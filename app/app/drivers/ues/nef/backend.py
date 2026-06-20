@@ -43,3 +43,33 @@ class NefUEsBackend(UEsInterface):
             "dynamic_camera_ues": [ue for ue in ues if isinstance(ue, DynamicCameraUE)],
             "pedestrian_ues": [ue for ue in ues if isinstance(ue, PedestrianUE)],
         }
+
+    async def start_movement(self, supi: str) -> bool:
+        LOG.info("Starting movement loop for UE supi=%s", supi)
+        res = await self._client.post(
+            "/api/v1/ue_movement/start-loop", json={"supi": supi}
+        )
+        if res.status_code == 409:
+            LOG.warning("Movement loop already started for UE supi=%s", supi)
+            return True
+        if not res.is_success:
+            raise RuntimeError(
+                f"Failed to start movement loop for supi={supi} ({res.status_code}): {res.text}"
+            )
+        LOG.info("Movement loop started for UE supi=%s", supi)
+        return True
+
+    async def stop_movement(self, supi: str) -> bool:
+        LOG.info("Stopping movement loop for UE supi=%s", supi)
+        res = await self._client.post(
+            "/api/v1/ue_movement/stop-loop", json={"supi": supi}
+        )
+        if res.status_code == 409:
+            LOG.info("Movement loop not running for UE supi=%s, nothing to stop", supi)
+            return True
+        if not res.is_success:
+            raise RuntimeError(
+                f"Failed to stop movement loop for supi={supi} ({res.status_code}): {res.text}"
+            )
+        LOG.info("Movement loop stopped for UE supi=%s", supi)
+        return True

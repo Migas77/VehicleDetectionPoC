@@ -1,11 +1,18 @@
 import logging
+from typing import cast, Iterable
 
 from fastapi import FastAPI
 
+import itertools
+
 from app.drivers import router as drivers_router
+from app.routers import router as routers_router
 from app.drivers.qod_provisioning import QoDProvisioningInterfaceDep
 from app.drivers.qos_profiles import QoSProfilesInterfaceDep
 from app.drivers.ues import UEsInterfaceDep
+from app.interfaces import QoDProvisioningInterface, QoSProfilesInterface
+from app.interfaces.ues import PocUEsByType, UEsInterface
+from app.schemas.poc import UE
 from app.schemas.poc.cameras import CameraUE
 from app.settings import settings
 
@@ -13,7 +20,7 @@ LOG = logging.getLogger(__name__)
 
 
 async def _verify_camera_qos_profiles(
-    qos_profiles_interface: QoSProfilesInterfaceDep, camera_ues: list[CameraUE]
+    qos_profiles_interface: QoSProfilesInterface, camera_ues: list[CameraUE]
 ) -> None:
     """Verify the QoS profile for each camera UE is active and matches the configured spec."""
     if not camera_ues:
@@ -30,7 +37,7 @@ async def _verify_camera_qos_profiles(
 
 
 async def _cleanup_stale_camera_qod_provisioning(
-    qod_provisioning_interface: QoDProvisioningInterfaceDep, camera_ues: list[CameraUE]
+    qod_provisioning_interface: QoDProvisioningInterface, camera_ues: list[CameraUE]
 ) -> None:
     """Delete any pre-existing QoD provisioning for each camera UE before assigning new ones."""
     for camera in camera_ues:
@@ -47,7 +54,7 @@ async def _cleanup_stale_camera_qod_provisioning(
 
 
 async def _assign_camera_qos_provisioning(
-    qod_provisioning_interface: QoDProvisioningInterfaceDep, camera_ues: list[CameraUE]
+    qod_provisioning_interface: QoDProvisioningInterface, camera_ues: list[CameraUE]
 ) -> list[str]:
     """Create QoD provisioning for each camera UE and return the list of provisioning IDs."""
     provisioning_ids: list[str] = []
@@ -57,8 +64,33 @@ async def _assign_camera_qos_provisioning(
     return provisioning_ids
 
 
+async def _start_moving_ues(
+    ues_interface: UEsInterface, ues_by_type: PocUEsByType
+) -> None:
+    """Start the movement loop for all car, dynamic camera, and pedestrian UEs."""
+    for ue in itertools.chain(
+        cast(Iterable[UE], ues_by_type["car_ues"]),
+        cast(Iterable[UE], ues_by_type["dynamic_camera_ues"]),
+        cast(Iterable[UE], ues_by_type["pedestrian_ues"]),
+    ):
+        await ues_interface.start_movement(ue.supi)
+
+
+async def _stop_moving_ues(
+    ues_interface: UEsInterface, ues_by_type: PocUEsByType
+) -> None:
+    """Stop the movement loop for all car, dynamic camera, and pedestrian UEs."""
+    for ue in itertools.chain(
+        cast(Iterable[UE], ues_by_type["car_ues"]),
+        cast(Iterable[UE], ues_by_type["dynamic_camera_ues"]),
+        cast(Iterable[UE], ues_by_type["pedestrian_ues"]),
+    ):
+        await ues_interface.stop_movement(ue.supi)
+
+
 app = FastAPI(title=settings.poc_title)
 app.include_router(drivers_router)
+app.include_router(routers_router)
 
 
 @app.get("/health")
@@ -97,6 +129,8 @@ async def bootstrap_poc(
     )
     LOG.info("QoD provisioning created for %d camera(s)", len(provisioning_ids))
 
+    await _start_moving_ues(ues_interface, ues_by_type)
+
     return {"bootstrap": "OK"}
 
 
@@ -106,13 +140,12 @@ async def cleanup_poc(
     ues_interface: UEsInterfaceDep,
 ) -> dict[str, str]:
     ues_by_type = await ues_interface.get_poc_ues_by_type()
-    camera_ues: list[CameraUE] = [
-        *ues_by_type["static_camera_ues"],
-        *ues_by_type["dynamic_camera_ues"],
-    ]
+    await _stop_moving_ues(ues_interface, ues_by_type)
 
     deleted = 0
-    for camera in camera_ues:
+    for camera in itertools.chain(
+        ues_by_type["static_camera_ues"], ues_by_type["dynamic_camera_ues"]
+    ):
         provisioning_id = (
             await qod_provisioning_interface.retrieve_qod_provisioning_by_device(camera)
         )
