@@ -1,5 +1,4 @@
 poc_title = "Vehicle Crash Detection PoC"
-poc_public_url = "http://localhost:8000"
 poc_af_id = "VehicleCrashDetectionPoC"
 log_level = "INFO"
 
@@ -10,12 +9,14 @@ auth_mode = "other"
 [camara]
 # not protected when net_apis.auth_mode = "other"
 url = "http://localhost:8000"
+poc_notification_url = "http://localhost:8080"
 
 [nef]
 # username and password required when net_apis.auth_mode = "other"
 url = "http://localhost:8888"
 username = "admin@my-email.com"
 password = "pass"
+poc_notification_url = "http://host.docker.internal:8080"
 
 [capif_sdk]
 capif_username = "username"

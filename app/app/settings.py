@@ -24,12 +24,14 @@ class NetApisSettings(BaseModel):
 
 class NefSettings(BaseModel):
     url: AnyHttpUrl
+    poc_notification_url: AnyHttpUrl
     username: str | None = None
     password: str | None = None
 
 
 class CamaraSettings(BaseModel):
     url: AnyHttpUrl
+    poc_notification_url: AnyHttpUrl
 
 
 class CapifSdkSettings(BaseModel):
@@ -82,7 +84,6 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(toml_file=["config.toml", "qos.toml"])
 
     poc_title: str
-    poc_public_url: AnyHttpUrl
     poc_af_id: str
     log_level: LogLevel = "INFO"
 
@@ -153,6 +154,16 @@ class Settings(BaseSettings):
                 "[camara] section is present in config.toml"
             )
         return httpx.AsyncClient(base_url=str(self.camara.url).rstrip("/"))
+
+    @property
+    def camara_notification_url(self) -> str:
+        """Return the CAMARA notification URL. Settings validator guarantees camara is not None."""
+        if self.camara is None:
+            raise RuntimeError(
+                "[camara] settings required — ensure net_apis.api = 'camara' and "
+                "[camara] section is present in config.toml"
+            )
+        return str(self.camara.poc_notification_url).rstrip("/")
 
     @classmethod
     def settings_customise_sources(
