@@ -11,6 +11,7 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
+from app.schemas.camara.common import Point
 from app.schemas.qos_profile import QosProfile
 
 
@@ -39,11 +40,19 @@ class CapifSdkSettings(BaseModel):
     capif_password: str
 
 
+class SurveyedAreaConfig(BaseModel):
+    radius: Annotated[int, Field(ge=1, le=200000)]  # metres
+    points: list[Point] | None = None  # optional polygon vertices (NEF refinement)
+
+
 class CamerasSettings(BaseModel):
     qos_profiles: dict[str, QosProfile]  # {profile_name : QosProfile}
     qos_profiles_assignment: dict[
         str, str
     ]  # {"default" / str(NEF UE db id) : profile_name}
+    surveyed_areas: dict[
+        str, SurveyedAreaConfig
+    ]  # {"default" / str(NEF UE db id) : SurveyedAreaConfig}
 
     @model_validator(mode="after")
     def _validate_qos_profile_assignments(self) -> "CamerasSettings":
@@ -57,6 +66,12 @@ class CamerasSettings(BaseModel):
                 )
         return self
 
+    @model_validator(mode="after")
+    def _validate_surveyed_areas(self) -> "CamerasSettings":
+        if "default" not in self.surveyed_areas:
+            raise ValueError("surveyed_areas must contain a 'default' key")
+        return self
+
     @property
     def default_qos_profile(self) -> QosProfile:
         return self.qos_profiles[self.qos_profiles_assignment["default"]]
@@ -66,6 +81,13 @@ class CamerasSettings(BaseModel):
         if name is None:
             return None
         return self.qos_profiles[name]  # validator guarantees name exists
+
+    @property
+    def default_surveyed_area(self) -> SurveyedAreaConfig:
+        return self.surveyed_areas["default"]  # validator guarantees presence
+
+    def get_area_by_ue_id(self, ue_id: int) -> SurveyedAreaConfig | None:
+        return self.surveyed_areas.get(str(ue_id))
 
 
 class RedisSettings(BaseModel):
@@ -87,7 +109,7 @@ class AnalyticsSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(toml_file=["config.toml", "qos.toml"])
+    model_config = SettingsConfigDict(toml_file=["config.toml", "cameras.toml"])
 
     poc_title: str
     poc_af_id: str

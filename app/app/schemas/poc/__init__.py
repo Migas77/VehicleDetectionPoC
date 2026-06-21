@@ -1,5 +1,7 @@
+from app.schemas.poc.area import SurveyedArea
 from app.schemas.poc.cameras import CameraUE, DynamicCameraUE, StaticCameraUE
 from app.schemas.poc.car import CarUE
+from app.schemas.poc.geofencing import GeofenceState, ManagedGeofencingSubscription
 from app.schemas.poc.pedestrian import PedestrianUE
 from app.schemas.poc.poc_ue import PocUE
 from app.schemas.poc.ue import UE
@@ -14,4 +16,7 @@ __all__ = [
     "DynamicCameraUE",
     "PedestrianUE",
     "PocUE",
+    "SurveyedArea",
+    "GeofenceState",
+    "ManagedGeofencingSubscription",
 ]

@@ -6,6 +6,7 @@ from fastapi import FastAPI
 import itertools
 
 from app.drivers import router as drivers_router
+from app.drivers.geofencing.deps import GeofencingInterfaceDep
 from app.routers import router as routers_router
 from app.drivers.analytics import AnalyticsInterfaceDep
 from app.drivers.application_profiles import ApplicationProfilesInterfaceDep
@@ -15,11 +16,13 @@ from app.drivers.ues import UEsInterfaceDep
 from app.interfaces import (
     AnalyticsInterface,
     ApplicationProfilesInterface,
+    GeofencingInterface,
     QoDProvisioningInterface,
     QoSProfilesInterface,
 )
 from app.interfaces.ues import PocUEsByType, UEsInterface
-from app.schemas.poc import UE
+from app.schemas.camara.common import Point
+from app.schemas.poc import UE, PedestrianUE, SurveyedArea
 from app.schemas.poc.cameras import CameraUE
 from app.settings import settings
 
@@ -102,6 +105,64 @@ async def _cleanup_camera_analytics_subscriptions(
     LOG.info("Analytics subscriptions deleted for camera UEs: %d", deleted)
 
 
+def _build_camera_surveyed_area(camera: CameraUE) -> SurveyedArea | None:
+    """Build the surveyed area for a camera from settings + its live location."""
+    if camera.latitude is None or camera.longitude is None:
+        LOG.warning(
+            "Camera UE id=%s has no location, skipping geofencing area", camera.id
+        )
+        return None
+    cfg = settings.cameras.get_area_by_ue_id(camera.id)
+    if cfg is None:
+        LOG.warning(
+            "No surveyed area assignment for camera UE id=%s, using default", camera.id
+        )
+        cfg = settings.cameras.default_surveyed_area
+    return SurveyedArea(
+        camera_id=camera.id,
+        center=Point(latitude=camera.latitude, longitude=camera.longitude),
+        radius=cfg.radius,
+        points=cfg.points,
+    )
+
+
+async def _create_pedestrian_geofencing_setup(
+    geofencing_interface: GeofencingInterface,
+    camera_ues: list[CameraUE],
+    pedestrian_ues: list[PedestrianUE],
+) -> None:
+    """Create area-entered/left geofencing subscriptions for each pedestrian × camera."""
+    count = 0
+    for camera in camera_ues:
+        area = _build_camera_surveyed_area(camera)
+        if area is None:
+            continue
+        for pedestrian in pedestrian_ues:
+            await geofencing_interface.create_geofencing_subscription(pedestrian, area)
+            count += 1
+    LOG.info("Geofencing subscriptions created for %d pedestrian-camera pair(s)", count)
+
+
+async def _cleanup_pedestrian_geofencing(
+    geofencing_interface: GeofencingInterface,
+    camera_ues: list[CameraUE],
+    pedestrian_ues: list[PedestrianUE],
+) -> None:
+    """Delete stored geofencing subscriptions per pedestrian and clear each camera's occupant set."""
+    deleted = 0
+    for pedestrian in pedestrian_ues:
+        for sub_id in await geofencing_interface.get_all_geofencing_subscriptions(
+            pedestrian
+        ):
+            await geofencing_interface.delete_geofencing_subscription(
+                pedestrian, sub_id
+            )
+            deleted += 1
+    for camera in camera_ues:
+        await geofencing_interface.clear_camera_area_subscribers(camera.id)
+    LOG.info("Geofencing subscriptions deleted: %d", deleted)
+
+
 async def _start_moving_ues(
     ues_interface: UEsInterface, ues_by_type: PocUEsByType
 ) -> None:
@@ -140,6 +201,7 @@ async def health() -> dict[str, str]:
 async def bootstrap_poc(
     analytics_interface: AnalyticsInterfaceDep,
     application_profiles_interface: ApplicationProfilesInterfaceDep,
+    geofencing_interface: GeofencingInterfaceDep,
     qod_provisioning_interface: QoDProvisioningInterfaceDep,
     qos_profiles_interface: QoSProfilesInterfaceDep,
     ues_interface: UEsInterfaceDep,
@@ -172,6 +234,16 @@ async def bootstrap_poc(
     await _create_camera_analytics_setup(
         application_profiles_interface, analytics_interface, camera_ues
     )
+
+    pedestrian_ues = ues_by_type["pedestrian_ues"]
+    # stale-cleanup any geofencing subscriptions/occupant sets from a previous run
+    await _cleanup_pedestrian_geofencing(
+        geofencing_interface, camera_ues, pedestrian_ues
+    )
+    await _create_pedestrian_geofencing_setup(
+        geofencing_interface, camera_ues, pedestrian_ues
+    )
+
     await _start_moving_ues(ues_interface, ues_by_type)
 
     return {"bootstrap": "OK"}
@@ -180,6 +252,7 @@ async def bootstrap_poc(
 @app.post("/internal/cleanup")
 async def cleanup_poc(
     analytics_interface: AnalyticsInterfaceDep,
+    geofencing_interface: GeofencingInterfaceDep,
     qod_provisioning_interface: QoDProvisioningInterfaceDep,
     ues_interface: UEsInterfaceDep,
 ) -> dict[str, str]:
@@ -192,6 +265,9 @@ async def cleanup_poc(
         *ues_by_type["dynamic_camera_ues"],
     ]
     await _cleanup_camera_analytics_subscriptions(analytics_interface, camera_ues)
+    await _cleanup_pedestrian_geofencing(
+        geofencing_interface, camera_ues, ues_by_type["pedestrian_ues"]
+    )
 
     deleted = 0
     for camera in camera_ues:

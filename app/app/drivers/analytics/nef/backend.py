@@ -14,7 +14,10 @@ from app.schemas.nef.analytics_exposure import (
     EventReportingRequirement,
     NotificationMethod,
     ReportingInformation,
-    TargetUeId, AddrFqdn, IpAddr, IpAddr1,
+    TargetUeId,
+    AddrFqdn,
+    IpAddr,
+    IpAddr1,
 )
 from app.schemas.poc.ue_with_qos import UeWithQoS
 from app.settings import settings
@@ -48,7 +51,11 @@ class NefAnalyticsBackend(AnalyticsInterface):
                         appServerAddrs=[
                             # Needed for current implementations of WLAN_PERFORMANCE event
                             # to specify target server address
-                            AddrFqdn(ipAddr=IpAddr(root=IpAddr1(ipv4Addr=settings.poc_app_server)))
+                            AddrFqdn(
+                                ipAddr=IpAddr(
+                                    root=IpAddr1(ipv4Addr=settings.poc_app_server)
+                                )
+                            )
                         ],
                         listOfAnaSubsets=[
                             AnalyticsSubset.TRAFFIC_INFO,
