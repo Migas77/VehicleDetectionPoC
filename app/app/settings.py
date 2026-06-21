@@ -85,6 +85,7 @@ class Settings(BaseSettings):
 
     poc_title: str
     poc_af_id: str
+    poc_app_server: str
     log_level: LogLevel = "INFO"
 
     net_apis: NetApisSettings

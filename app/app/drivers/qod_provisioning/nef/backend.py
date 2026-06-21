@@ -94,11 +94,16 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
         LOG.info("Deleting NEF AsSessionWithQoS subscription id=%s", provisioning_id)
         url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions/{provisioning_id}"
         res = await self._client.delete(url)
-        if not res.is_success:
-            LOG.error(
-                "NEF AsSessionWithQoS delete failed (%s): %s", res.status_code, res.text
+        if res.status_code == 404:
+            LOG.warning(
+                "NEF AsSessionWithQoS subscription id=%s not found for deletion",
+                provisioning_id,
             )
             return False
+        if not res.is_success:
+            raise RuntimeError(
+                f"NEF AsSessionWithQoS delete failed ({res.status_code}): {res.text}"
+            )
         LOG.info("NEF subscription deleted, subscriptionId=%s", provisioning_id)
         return True
 

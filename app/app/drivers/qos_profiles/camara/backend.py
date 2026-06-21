@@ -84,8 +84,8 @@ class CamaraQoSProfilesBackend(QoSProfilesInterface):
         camara_dl_bps = rate_to_bps(
             camara_downstream_rate.value, camara_downstream_rate.unit.value
         )
-        expected_ul = ue.qos_profile.ul_bitrate_bps()
-        expected_dl = ue.qos_profile.dl_bitrate_bps()
+        expected_ul = ue.qos_profile.max_ul_bitrate_bps()
+        expected_dl = ue.qos_profile.max_dl_bitrate_bps()
 
         if camara_ul_bps != expected_ul:
             LOG.warning(

@@ -89,13 +89,15 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
         res = await self._client.delete(
             f"/qod-provisioning/v0.2/device-qos/{provisioning_id}"
         )
-        if not res.is_success:
-            LOG.error(
-                "CAMARA QoD delete provisioning failed (%s): %s",
-                res.status_code,
-                res.text,
+        if res.status_code == 404:
+            LOG.warning(
+                "CAMARA QoD provisioning id=%s not found for deletion", provisioning_id
             )
             return False
+        if not res.is_success:
+            raise RuntimeError(
+                f"CAMARA QoD delete provisioning failed ({res.status_code}): {res.text}"
+            )
         LOG.info("CAMARA QoD provisioning id=%s deleted", provisioning_id)
         return True
 

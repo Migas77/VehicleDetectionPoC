@@ -1,9 +1,10 @@
+log_level = "INFO"
 poc_title = "Vehicle Crash Detection PoC"
 poc_af_id = "VehicleCrashDetectionPoC"
-log_level = "INFO"
+poc_app_server = "10.100.0.1"
 
 [net_apis]
-api = "nef"
+api = "camara"
 auth_mode = "other"
 
 [camara]

@@ -1,10 +1,9 @@
 [cameras.qos_profiles]
-QCI_1_voice = {ul_bitrate = "100 Kbps", dl_bitrate = "100 Kbps", qos_profile_name = "QCI_1_voice"}
-QCI_2_voice = {ul_bitrate = "400 Kbps", dl_bitrate = "400 Kbps", qos_profile_name = "QCI_2_voice"}
+QCI_1_voice = {qos_profile_name = "QCI_1_voice", min_ul_bitrate = "50 Kbps", max_ul_bitrate = "100 Kbps", min_dl_bitrate = "50 Kbps", max_dl_bitrate = "100 Kbps"}
+QCI_2_voice = {qos_profile_name = "QCI_2_voice", min_ul_bitrate = "200 Kbps", max_ul_bitrate = "400 Kbps", min_dl_bitrate = "200 Kbps", max_dl_bitrate = "400 Kbps"}
 
 [cameras.qos_profiles_assignment]
 # Apart from default profile, the keys follow the initialization order in nef_db_init.sh
 default = "QCI_1_voice"
 1       = "QCI_2_voice"
 2       = "QCI_2_voice"
-

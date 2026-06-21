@@ -6,11 +6,19 @@ from app.schemas.nef.analytics_exposure import BitRate
 
 class QosProfile(BaseModel):
     qos_profile_name: str
-    ul_bitrate: BitRate
-    dl_bitrate: BitRate
+    min_ul_bitrate: BitRate
+    max_ul_bitrate: BitRate
+    min_dl_bitrate: BitRate
+    max_dl_bitrate: BitRate
 
-    def ul_bitrate_bps(self) -> int:
-        return bitrate_str_to_bps(self.ul_bitrate)
+    def min_ul_bitrate_bps(self) -> int:
+        return bitrate_str_to_bps(self.min_ul_bitrate)
 
-    def dl_bitrate_bps(self) -> int:
-        return bitrate_str_to_bps(self.dl_bitrate)
+    def max_ul_bitrate_bps(self) -> int:
+        return bitrate_str_to_bps(self.max_ul_bitrate)
+
+    def min_dl_bitrate_bps(self) -> int:
+        return bitrate_str_to_bps(self.min_dl_bitrate)
+
+    def max_dl_bitrate_bps(self) -> int:
+        return bitrate_str_to_bps(self.max_dl_bitrate)

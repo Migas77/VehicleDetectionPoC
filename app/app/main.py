@@ -7,10 +7,17 @@ import itertools
 
 from app.drivers import router as drivers_router
 from app.routers import router as routers_router
+from app.drivers.analytics import AnalyticsInterfaceDep
+from app.drivers.application_profiles import ApplicationProfilesInterfaceDep
 from app.drivers.qod_provisioning import QoDProvisioningInterfaceDep
 from app.drivers.qos_profiles import QoSProfilesInterfaceDep
 from app.drivers.ues import UEsInterfaceDep
-from app.interfaces import QoDProvisioningInterface, QoSProfilesInterface
+from app.interfaces import (
+    AnalyticsInterface,
+    ApplicationProfilesInterface,
+    QoDProvisioningInterface,
+    QoSProfilesInterface,
+)
 from app.interfaces.ues import PocUEsByType, UEsInterface
 from app.schemas.poc import UE
 from app.schemas.poc.cameras import CameraUE
@@ -64,6 +71,25 @@ async def _assign_camera_qos_provisioning(
     return provisioning_ids
 
 
+async def _create_camera_analytics_setup(
+    application_profiles_interface: ApplicationProfilesInterface,
+    analytics_interface: AnalyticsInterface,
+    camera_ues: list[CameraUE],
+) -> list[str]:
+    """Create an ApplicationProfile and analytics subscription for each camera UE."""
+    subscription_ids: list[str] = []
+    for camera in camera_ues:
+        profile = await application_profiles_interface.create_application_profile(
+            camera
+        )
+        sub_id = await analytics_interface.create_analytics_subscription(
+            camera, profile.applicationProfileId
+        )
+        subscription_ids.append(sub_id)
+    LOG.info("Analytics setup created for %d camera(s)", len(subscription_ids))
+    return subscription_ids
+
+
 async def _start_moving_ues(
     ues_interface: UEsInterface, ues_by_type: PocUEsByType
 ) -> None:
@@ -100,6 +126,8 @@ async def health() -> dict[str, str]:
 
 @app.post("/internal/bootstrap")
 async def bootstrap_poc(
+    analytics_interface: AnalyticsInterfaceDep,
+    application_profiles_interface: ApplicationProfilesInterfaceDep,
     qod_provisioning_interface: QoDProvisioningInterfaceDep,
     qos_profiles_interface: QoSProfilesInterfaceDep,
     ues_interface: UEsInterfaceDep,
@@ -129,6 +157,9 @@ async def bootstrap_poc(
     )
     LOG.info("QoD provisioning created for %d camera(s)", len(provisioning_ids))
 
+    await _create_camera_analytics_setup(
+        application_profiles_interface, analytics_interface, camera_ues
+    )
     await _start_moving_ues(ues_interface, ues_by_type)
 
     return {"bootstrap": "OK"}
@@ -139,6 +170,7 @@ async def cleanup_poc(
     qod_provisioning_interface: QoDProvisioningInterfaceDep,
     ues_interface: UEsInterfaceDep,
 ) -> dict[str, str]:
+    # Shutdown
     ues_by_type = await ues_interface.get_poc_ues_by_type()
     await _stop_moving_ues(ues_interface, ues_by_type)
 
@@ -152,7 +184,6 @@ async def cleanup_poc(
         if provisioning_id is not None:
             await qod_provisioning_interface.delete_qod_provisioning(provisioning_id)
             deleted += 1
-
     LOG.info("QoD provisioning deleted for %d camera(s)", deleted)
 
     return {"cleanup": "OK"}
