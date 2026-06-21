@@ -90,6 +90,18 @@ async def _create_camera_analytics_setup(
     return subscription_ids
 
 
+async def _cleanup_camera_analytics_subscriptions(
+    analytics_interface: AnalyticsInterface, camera_ues: list[CameraUE]
+) -> None:
+    """Delete every analytics subscription previously stored for each camera UE."""
+    deleted = 0
+    for camera in camera_ues:
+        for sub_id in await analytics_interface.get_all_analytics_subscriptions(camera):
+            await analytics_interface.delete_analytics_subscription(camera, sub_id)
+            deleted += 1
+    LOG.info("Analytics subscriptions deleted for camera UEs: %d", deleted)
+
+
 async def _start_moving_ues(
     ues_interface: UEsInterface, ues_by_type: PocUEsByType
 ) -> None:
@@ -167,6 +179,7 @@ async def bootstrap_poc(
 
 @app.post("/internal/cleanup")
 async def cleanup_poc(
+    analytics_interface: AnalyticsInterfaceDep,
     qod_provisioning_interface: QoDProvisioningInterfaceDep,
     ues_interface: UEsInterfaceDep,
 ) -> dict[str, str]:
@@ -174,10 +187,14 @@ async def cleanup_poc(
     ues_by_type = await ues_interface.get_poc_ues_by_type()
     await _stop_moving_ues(ues_interface, ues_by_type)
 
+    camera_ues: list[CameraUE] = [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+    await _cleanup_camera_analytics_subscriptions(analytics_interface, camera_ues)
+
     deleted = 0
-    for camera in itertools.chain(
-        ues_by_type["static_camera_ues"], ues_by_type["dynamic_camera_ues"]
-    ):
+    for camera in camera_ues:
         provisioning_id = (
             await qod_provisioning_interface.retrieve_qod_provisioning_by_device(camera)
         )

@@ -89,6 +89,7 @@ class NefAnalyticsBackend(AnalyticsInterface):
                 f"NEF analytics subscription response missing 'self' link for UE id={ue.id}"
             )
         sub_id = self._extract_subscription_id(str(subscription.self))
+        await self._redis.set(self._subscription_key(ue.id, sub_id), sub_id)
         LOG.info(
             "NEF analytics subscription created for UE id=%s, subscriptionId=%s",
             ue.id,
@@ -96,7 +97,9 @@ class NefAnalyticsBackend(AnalyticsInterface):
         )
         return sub_id
 
-    async def delete_analytics_subscription(self, subscription_id: str) -> bool:
+    async def delete_analytics_subscription(
+        self, ue: UeWithQoS, subscription_id: str
+    ) -> bool:
         LOG.info("Deleting NEF analytics subscription id=%s", subscription_id)
         url = (
             f"/nef/api/v1/3gpp-analyticsexposure/v1/"
@@ -108,11 +111,13 @@ class NefAnalyticsBackend(AnalyticsInterface):
                 "NEF analytics subscription id=%s not found for deletion",
                 subscription_id,
             )
+            await self._redis.delete(self._subscription_key(ue.id, subscription_id))
             return False
         if not res.is_success:
             raise RuntimeError(
                 f"NEF analytics subscription delete failed ({res.status_code}): {res.text}"
             )
+        await self._redis.delete(self._subscription_key(ue.id, subscription_id))
         LOG.info(
             "NEF analytics subscription deleted, subscriptionId=%s", subscription_id
         )

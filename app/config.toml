@@ -27,3 +27,8 @@ capif_password = "password"
 offset_period = -5
 temporal_gran_size = 5
 rep_period = 5
+
+[redis]
+url = "redis://localhost:6379"
+# username = "..."   # optional
+# password = "..."   # optional

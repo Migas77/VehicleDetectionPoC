@@ -3,7 +3,7 @@ from typing import Annotated, Literal
 
 import httpx
 
-from pydantic import AnyHttpUrl, BaseModel, Field, model_validator
+from pydantic import AnyHttpUrl, BaseModel, Field, RedisDsn, model_validator
 from pydantic_settings import (
     BaseSettings,
     PydanticBaseSettingsSource,
@@ -68,6 +68,12 @@ class CamerasSettings(BaseModel):
         return self.qos_profiles[name]  # validator guarantees name exists
 
 
+class RedisSettings(BaseModel):
+    url: RedisDsn = RedisDsn("redis://localhost:6379")
+    username: str | None = None
+    password: str | None = None
+
+
 class AnalyticsSettings(BaseModel):
     offset_period: Annotated[int, Field(le=-1)]  # negative (historic data) - in seconds
     temporal_gran_size: Annotated[int, Field(ge=1)]  # in seconds
@@ -94,6 +100,7 @@ class Settings(BaseSettings):
     capif_sdk: CapifSdkSettings | None = None
     analytics: AnalyticsSettings
     cameras: CamerasSettings
+    redis: RedisSettings = Field(default_factory=RedisSettings)
 
     @model_validator(mode="after")
     def validate_required_sections(self) -> "Settings":

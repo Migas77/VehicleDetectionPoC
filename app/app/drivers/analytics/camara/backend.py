@@ -31,6 +31,7 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
     """Creates and deletes Connectivity Insights Subscriptions via the CAMARA CIS API."""
 
     def __init__(self) -> None:
+        super().__init__()
         self._client = settings.create_camara_client()
         self._notification_url = settings.camara_notification_url
 
@@ -88,6 +89,7 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             )
         subscription = CISSubscriptionTypeAdapter.validate_json(res.content)
         sub_id = subscription.id
+        await self._redis.set(self._subscription_key(ue.id, sub_id), sub_id)
         LOG.info(
             "CAMARA CIS subscription created for UE id=%s, subscriptionId=%s",
             ue.id,
@@ -95,7 +97,9 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
         )
         return sub_id
 
-    async def delete_analytics_subscription(self, subscription_id: str) -> bool:
+    async def delete_analytics_subscription(
+        self, ue: UeWithQoS, subscription_id: str
+    ) -> bool:
         LOG.info("Deleting CAMARA CIS subscription id=%s", subscription_id)
         res = await self._client.delete(
             f"/connectivity-insights-subscriptions/v0.6/subscriptions/{subscription_id}"
@@ -104,10 +108,12 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             LOG.warning(
                 "CAMARA CIS subscription id=%s not found for deletion", subscription_id
             )
+            await self._redis.delete(self._subscription_key(ue.id, subscription_id))
             return False
         if not res.is_success:
             raise RuntimeError(
                 f"CAMARA CIS subscription delete failed ({res.status_code}): {res.text}"
             )
+        await self._redis.delete(self._subscription_key(ue.id, subscription_id))
         LOG.info("CAMARA CIS subscription id=%s deleted", subscription_id)
         return True
