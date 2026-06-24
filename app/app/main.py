@@ -6,20 +6,22 @@ from fastapi import FastAPI
 import itertools
 
 from app.drivers import router as drivers_router
-from app.drivers.geofencing.deps import GeofencingInterfaceDep
-from app.routers import router as routers_router
 from app.drivers.analytics import AnalyticsInterfaceDep
 from app.drivers.application_profiles import ApplicationProfilesInterfaceDep
+from app.drivers.crash_inference import CrashInferenceInterfaceDep
+from app.drivers.geofencing.deps import GeofencingInterfaceDep
 from app.drivers.qod_provisioning import QoDProvisioningInterfaceDep
 from app.drivers.qos_profiles import QoSProfilesInterfaceDep
 from app.drivers.ues import UEsInterfaceDep
 from app.interfaces import (
     AnalyticsInterface,
     ApplicationProfilesInterface,
+    CrashInferenceInterface,
     GeofencingInterface,
     QoDProvisioningInterface,
     QoSProfilesInterface,
 )
+from app.routers import router as routers_router
 from app.interfaces.ues import PocUEsByType, UEsInterface
 from app.schemas.camara.common import Point
 from app.schemas.poc import UE, PedestrianUE, SurveyedArea
@@ -163,6 +165,29 @@ async def _cleanup_pedestrian_geofencing(
     LOG.info("Geofencing subscriptions deleted: %d", deleted)
 
 
+async def _start_camera_inference_pipelines(
+    crash_inference_interface: CrashInferenceInterface,
+    camera_ues: list[CameraUE],
+) -> None:
+    """Start crash inference pipelines for all inference-enabled camera UEs."""
+    started = 0
+    for camera in camera_ues:
+        pipeline_id = await crash_inference_interface.start_pipeline(camera)
+        if pipeline_id is not None:
+            started += 1
+    LOG.info("Crash inference pipelines started for %d camera(s)", started)
+
+
+async def _terminate_camera_inference_pipelines(
+    crash_inference_interface: CrashInferenceInterface,
+    camera_ues: list[CameraUE],
+) -> None:
+    """Terminate crash inference pipelines for all camera UEs."""
+    for camera in camera_ues:
+        await crash_inference_interface.terminate_pipeline(camera)
+    LOG.info("Crash inference pipelines terminated for %d camera(s)", len(camera_ues))
+
+
 async def _start_moving_ues(
     ues_interface: UEsInterface, ues_by_type: PocUEsByType
 ) -> None:
@@ -246,7 +271,7 @@ async def bootstrap_poc(
 
     await _start_moving_ues(ues_interface, ues_by_type)
 
-    return {"bootstrap": "OK"}
+    return {"internal_boostrap": "OK"}
 
 
 @app.post("/internal/cleanup")
@@ -258,12 +283,12 @@ async def cleanup_poc(
 ) -> dict[str, str]:
     # Shutdown
     ues_by_type = await ues_interface.get_poc_ues_by_type()
-    await _stop_moving_ues(ues_interface, ues_by_type)
-
     camera_ues: list[CameraUE] = [
         *ues_by_type["static_camera_ues"],
         *ues_by_type["dynamic_camera_ues"],
     ]
+    await _stop_moving_ues(ues_interface, ues_by_type)
+
     await _cleanup_camera_analytics_subscriptions(analytics_interface, camera_ues)
     await _cleanup_pedestrian_geofencing(
         geofencing_interface, camera_ues, ues_by_type["pedestrian_ues"]
@@ -279,4 +304,32 @@ async def cleanup_poc(
             deleted += 1
     LOG.info("QoD provisioning deleted for %d camera(s)", deleted)
 
-    return {"cleanup": "OK"}
+    return {"internal_cleanup": "OK"}
+
+
+@app.post("/inference/bootstrap")
+async def bootstrap_inference(
+    crash_inference_interface: CrashInferenceInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    ues_by_type = await ues_interface.get_poc_ues_by_type()
+    camera_ues: list[CameraUE] = [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+    await _start_camera_inference_pipelines(crash_inference_interface, camera_ues)
+    return {"inference_bootstrap": "OK"}
+
+
+@app.post("/inference/cleanup")
+async def cleanup_inference(
+    crash_inference_interface: CrashInferenceInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    ues_by_type = await ues_interface.get_poc_ues_by_type()
+    camera_ues: list[CameraUE] = [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+    await _terminate_camera_inference_pipelines(crash_inference_interface, camera_ues)
+    return {"inference_cleanup": "OK"}

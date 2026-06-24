@@ -28,6 +28,18 @@ offset_period = -5
 temporal_gran_size = 5
 rep_period = 5
 
+[roboflow]
+api_key = "replace_me"
+
+[crash_inference]
+model_id = "accident-detection-qgglm/3"
+classes = ["Accident", "mild", "moderate", "severe"]
+debounce_seconds = 4
+intervention_threshold = 0.40
+average_car_crash_duration = 0.20 # seconds
+inference_server_url = "http://192.168.0.154:9001"
+poc_notification_url = "http://192.168.0.180:8080"
+
 [redis]
 url = "redis://localhost:6379"
 # username = "..."   # optional

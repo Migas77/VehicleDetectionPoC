@@ -15,3 +15,8 @@ default = "QCI_1_voice"
 default = {radius = 300}
 1       = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}
 2       = {radius = 200}
+
+[cameras.inference]
+# Apart from default, the keys follow the initialization order in nef_db_init.sh
+default = {inference_enabled = false}
+1       = {inference_enabled = true, video_reference = "rtsp://192.168.0.180:8554/mystream", max_fps = 15}

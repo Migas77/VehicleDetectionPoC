@@ -1,11 +1,21 @@
 import logging
+import math
+from functools import lru_cache
 from typing import Annotated, Literal
 
 import httpx
 
-from pydantic import AnyHttpUrl, BaseModel, Field, RedisDsn, model_validator
+from pydantic import (
+    AnyHttpUrl,
+    BaseModel,
+    Field,
+    RedisDsn,
+    field_validator,
+    model_validator,
+)
 from pydantic_settings import (
     BaseSettings,
+    DotEnvSettingsSource,
     PydanticBaseSettingsSource,
     SettingsConfigDict,
     TomlConfigSettingsSource,
@@ -45,6 +55,18 @@ class SurveyedAreaConfig(BaseModel):
     points: list[Point] | None = None  # optional polygon vertices (NEF refinement)
 
 
+class CameraInferenceConfig(BaseModel):
+    inference_enabled: bool = False
+    video_reference: str | None = None
+    max_fps: int = 15
+
+    @model_validator(mode="after")
+    def _validate_when_enabled(self) -> "CameraInferenceConfig":
+        if self.inference_enabled and self.video_reference is None:
+            raise ValueError("video_reference is required when inference_enabled=true")
+        return self
+
+
 class CamerasSettings(BaseModel):
     qos_profiles: dict[str, QosProfile]  # {profile_name : QosProfile}
     qos_profiles_assignment: dict[
@@ -53,6 +75,9 @@ class CamerasSettings(BaseModel):
     surveyed_areas: dict[
         str, SurveyedAreaConfig
     ]  # {"default" / str(NEF UE db id) : SurveyedAreaConfig}
+    inference: dict[str, CameraInferenceConfig] = Field(
+        default_factory=dict
+    )  # {"default" / str(NEF UE db id) : CameraInferenceConfig}
 
     @model_validator(mode="after")
     def _validate_qos_profile_assignments(self) -> "CamerasSettings":
@@ -89,11 +114,46 @@ class CamerasSettings(BaseModel):
     def get_area_by_ue_id(self, ue_id: int) -> SurveyedAreaConfig | None:
         return self.surveyed_areas.get(str(ue_id))
 
+    def get_inference_config_by_ue_id(self, ue_id: int) -> CameraInferenceConfig:
+        return (
+            self.inference.get(str(ue_id))
+            or self.inference.get("default")
+            or CameraInferenceConfig()
+        )
+
+
+class RoboflowSettings(BaseModel):
+    api_key: str
+
 
 class RedisSettings(BaseModel):
     url: RedisDsn = RedisDsn("redis://localhost:6379")
     username: str | None = None
     password: str | None = None
+
+
+class CrashInferenceSettings(BaseModel):
+    model_id: str
+    classes: set[str]
+    debounce_seconds: Annotated[float, Field(gt=0.0)]
+    intervention_threshold: Annotated[float, Field(gt=0.0, lt=1.0)]
+    average_car_crash_duration: Annotated[float, Field(gt=0.0)]
+    inference_server_url: AnyHttpUrl
+    poc_notification_url: AnyHttpUrl
+
+    @field_validator("classes", mode="after")
+    @classmethod
+    def _normalize_classes(cls, v: set[str]) -> set[str]:
+        return {c.lower() for c in v}
+
+    @staticmethod
+    @lru_cache(maxsize=None)
+    def _compute_window_size(average_car_crash_duration: float, max_fps: int) -> int:
+        return max(1, math.ceil(average_car_crash_duration * max_fps))
+
+    def crash_window_size(self, max_fps: int) -> int:
+        """Number of frames in the crash-detection sliding window for a given camera fps."""
+        return self._compute_window_size(self.average_car_crash_duration, max_fps)
 
 
 class AnalyticsSettings(BaseModel):
@@ -109,12 +169,17 @@ class AnalyticsSettings(BaseModel):
 
 
 class Settings(BaseSettings):
-    model_config = SettingsConfigDict(toml_file=["config.toml", "cameras.toml"])
+    model_config = SettingsConfigDict(
+        toml_file=["config.toml", "cameras.toml"],
+        env_file=".env",
+    )
 
     poc_title: str
     poc_af_id: str
     poc_app_server: str
     log_level: LogLevel = "INFO"
+
+    roboflow: RoboflowSettings
 
     net_apis: NetApisSettings
     nef: NefSettings
@@ -122,6 +187,7 @@ class Settings(BaseSettings):
     capif_sdk: CapifSdkSettings | None = None
     analytics: AnalyticsSettings
     cameras: CamerasSettings
+    crash_inference: CrashInferenceSettings
     redis: RedisSettings = Field(default_factory=RedisSettings)
 
     @model_validator(mode="after")
@@ -206,6 +272,7 @@ class Settings(BaseSettings):
     ) -> tuple[PydanticBaseSettingsSource, ...]:
         return (
             env_settings,
+            DotEnvSettingsSource(settings_cls),
             TomlConfigSettingsSource(settings_cls),
         )
 
