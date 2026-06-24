@@ -16,14 +16,19 @@ mediamtx: ## Run the MediaMTX streaming server via Docker
 		echo "Error: MTX_WEBRTCADDITIONALHOSTS is still set to the placeholder value (192.168.x.x,192.168.x.x). Update it in .env before running."; \
 		exit 1; \
 	fi
+	# ---- Port map ----
+	# 8554       RTSP (TCP)
+	# 1935       RTMP            [not exposed]
+	# 8888       HLS             [not exposed]
+	# 8889       WebRTC signaling
+	# 8890/udp   SRT             [not exposed]
+	# 8189/udp   WebRTC ICE/UDP
+	# -------------------
 	docker run -d --name mediamtx \
 		-e MTX_RTSPTRANSPORTS=tcp \
 		-e MTX_WEBRTCADDITIONALHOSTS=$(MTX_WEBRTCADDITIONALHOSTS) \
 		-p 8554:8554 \
-		-p 1935:1935 \
-		-p 8888:8888 \
 		-p 8889:8889 \
-		-p 8890:8890/udp \
 		-p 8189:8189/udp \
 		bluenviron/mediamtx:1
 
