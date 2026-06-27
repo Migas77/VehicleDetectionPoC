@@ -26,6 +26,10 @@ class UEsInterface(ABC):
         """Return PocUEs grouped by UE type (car, static camera, dynamic camera, pedestrian)."""
 
     @abstractmethod
+    async def get_ue_by_supi(self, supi: str) -> UE:
+        """Return the UE with the given SUPI from the NEF, or raise RuntimeError if not found."""
+
+    @abstractmethod
     async def start_movement(self, supi: str) -> bool:
         """Start the movement loop for the UE with the given SUPI. Returns True on success."""
 

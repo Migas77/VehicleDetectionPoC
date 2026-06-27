@@ -44,6 +44,16 @@ class NefUEsBackend(UEsInterface):
             "pedestrian_ues": [ue for ue in ues if isinstance(ue, PedestrianUE)],
         }
 
+    async def get_ue_by_supi(self, supi: str) -> UE:
+        res = await self._client.get(f"/api/v1/UEs/{supi}")
+        if res.status_code == 404:
+            raise RuntimeError(f"UE supi={supi} not found in NEF")
+        if not res.is_success:
+            raise RuntimeError(
+                f"Failed to fetch UE supi={supi} from NEF ({res.status_code}): {res.text}"
+            )
+        return UE.model_validate_json(res.content)
+
     async def start_movement(self, supi: str) -> bool:
         LOG.info("Starting movement loop for UE supi=%s", supi)
         res = await self._client.post(
