@@ -19,7 +19,7 @@ class ManagedGeofencingSubscription(BaseModel):
     """
 
     subscription_id: str
-    ue_id: int
+    ue_supi: str
     area: SurveyedArea
     types: list[SubscriptionEventType]  # [v0_area_entered, v0_area_left]
     nef_subscription_url: str  # NEF monitoring 'self' link, for deletion

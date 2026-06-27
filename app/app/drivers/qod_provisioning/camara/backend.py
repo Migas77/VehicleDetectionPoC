@@ -41,20 +41,20 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
             phone = ue.msisdn if ue.msisdn.startswith("+") else f"+{ue.msisdn}"
             return Device(phoneNumber=phone)
         raise ValueError(
-            f"Cannot identify device for UE id={ue.id}: "
+            f"Cannot identify device for UE supi={ue.supi}: "
             "neither ip_address_v4 nor msisdn is set"
         )
 
     async def assign_qos_profile(self, ue: UeWithQoS) -> str:
-        sink = f"{self._notification_url}/callbacks/qod-provisioning/camara/{ue.id}"
+        sink = f"{self._notification_url}/callbacks/qod-provisioning/camara/{ue.supi}"
         payload = TriggerProvisioning(
             device=self._build_device(ue),
             qosProfile=ue.qos_profile.qos_profile_name,
             sink=sink,
         )
         LOG.info(
-            "Creating CAMARA QoD provisioning for UE id=%s, qosProfile=%s",
-            ue.id,
+            "Creating CAMARA QoD provisioning for UE supi=%s, qosProfile=%s",
+            ue.supi,
             ue.qos_profile.qos_profile_name,
         )
         res = await self._client.post(
@@ -68,8 +68,8 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
             )
         provisioning = ProvisioningInfo.model_validate_json(res.content)
         LOG.info(
-            "CAMARA QoD provisioning created for UE id=%s, provisioningId=%s",
-            ue.id,
+            "CAMARA QoD provisioning created for UE supi=%s, provisioningId=%s",
+            ue.supi,
             provisioning.provisioningId,
         )
         return str(provisioning.provisioningId)

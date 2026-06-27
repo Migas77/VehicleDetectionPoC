@@ -37,11 +37,11 @@ class NefAnalyticsBackend(AnalyticsInterface):
     ) -> str:
         if ue.msisdn is None:
             raise ValueError(
-                f"Cannot create analytics subscription for UE id={ue.id}: msisdn is required"
+                f"Cannot create analytics subscription for UE supi={ue.supi}: msisdn is required"
             )
         notification_url = (
             f"{str(settings.nef.poc_notification_url).rstrip('/')}"
-            f"/callbacks/analytics/nef/{ue.id}"
+            f"/callbacks/analytics/nef/{ue.supi}"
         )
         payload = AnalyticsExposureSubsc(
             analyEventsSubs=[
@@ -82,8 +82,8 @@ class NefAnalyticsBackend(AnalyticsInterface):
             f"/nef/api/v1/3gpp-analyticsexposure/v1/{settings.poc_af_id}/subscriptions"
         )
         LOG.info(
-            "Creating NEF analytics subscription for UE id=%s, applicationProfileId=%s",
-            ue.id,
+            "Creating NEF analytics subscription for UE supi=%s, applicationProfileId=%s",
+            ue.supi,
             application_profile_id,
         )
         res = await self._client.post(
@@ -98,13 +98,13 @@ class NefAnalyticsBackend(AnalyticsInterface):
         subscription = AnalyticsExposureSubsc.model_validate_json(res.content)
         if subscription.self is None:
             raise RuntimeError(
-                f"NEF analytics subscription response missing 'self' link for UE id={ue.id}"
+                f"NEF analytics subscription response missing 'self' link for UE supi={ue.supi}"
             )
         sub_id = self._extract_subscription_id(str(subscription.self))
-        await self._redis.set(self._subscription_key(ue.id, sub_id), sub_id)
+        await self._redis.set(self._subscription_key(ue.supi, sub_id), sub_id)
         LOG.info(
-            "NEF analytics subscription created for UE id=%s, subscriptionId=%s",
-            ue.id,
+            "NEF analytics subscription created for UE supi=%s, subscriptionId=%s",
+            ue.supi,
             sub_id,
         )
         return sub_id
@@ -123,13 +123,13 @@ class NefAnalyticsBackend(AnalyticsInterface):
                 "NEF analytics subscription id=%s not found for deletion",
                 subscription_id,
             )
-            await self._redis.delete(self._subscription_key(ue.id, subscription_id))
+            await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
             return False
         if not res.is_success:
             raise RuntimeError(
                 f"NEF analytics subscription delete failed ({res.status_code}): {res.text}"
             )
-        await self._redis.delete(self._subscription_key(ue.id, subscription_id))
+        await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
         LOG.info(
             "NEF analytics subscription deleted, subscriptionId=%s", subscription_id
         )

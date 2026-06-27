@@ -46,7 +46,7 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
         network_access_id = ue.external_identifier
         if phone is None and network_access_id is None:
             raise ValueError(
-                f"Cannot identify device for UE id={ue.id} for CIS subscription: "
+                f"Cannot identify device for UE supi={ue.supi} for CIS subscription: "
                 "msisdn or external_identifier is required"
             )
         return Device(phoneNumber=phone, networkAccessIdentifier=network_access_id)
@@ -54,7 +54,7 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
     async def create_analytics_subscription(
         self, ue: UeWithQoS, application_profile_id: ApplicationProfileId
     ) -> str:
-        sink = f"{self._notification_url}/callbacks/analytics/camara/{ue.id}"
+        sink = f"{self._notification_url}/callbacks/analytics/camara/{ue.supi}"
         payload: SubscriptionRequest = NetworkQualitySubscriptionRequest(
             sink=sink,
             types=[
@@ -72,8 +72,8 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             ),
         )
         LOG.info(
-            "Creating CAMARA CIS subscription for UE id=%s, applicationProfileId=%s",
-            ue.id,
+            "Creating CAMARA CIS subscription for UE supi=%s, applicationProfileId=%s",
+            ue.supi,
             application_profile_id,
         )
         res = await self._client.post(
@@ -89,10 +89,10 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             )
         subscription = CISSubscriptionTypeAdapter.validate_json(res.content)
         sub_id = subscription.id
-        await self._redis.set(self._subscription_key(ue.id, sub_id), sub_id)
+        await self._redis.set(self._subscription_key(ue.supi, sub_id), sub_id)
         LOG.info(
-            "CAMARA CIS subscription created for UE id=%s, subscriptionId=%s",
-            ue.id,
+            "CAMARA CIS subscription created for UE supi=%s, subscriptionId=%s",
+            ue.supi,
             sub_id,
         )
         return sub_id
@@ -108,12 +108,12 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             LOG.warning(
                 "CAMARA CIS subscription id=%s not found for deletion", subscription_id
             )
-            await self._redis.delete(self._subscription_key(ue.id, subscription_id))
+            await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
             return False
         if not res.is_success:
             raise RuntimeError(
                 f"CAMARA CIS subscription delete failed ({res.status_code}): {res.text}"
             )
-        await self._redis.delete(self._subscription_key(ue.id, subscription_id))
+        await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
         LOG.info("CAMARA CIS subscription id=%s deleted", subscription_id)
         return True

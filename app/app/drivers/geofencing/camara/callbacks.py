@@ -10,24 +10,24 @@ LOG = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/camara/{ue_id}/{camera_id}")
+@router.post("/camara/{ue_supi}/{camera_supi}")
 async def camara_geofencing_callback(
-    ue_id: int,
-    camera_id: int,
+    ue_supi: str,
+    camera_supi: str,
     body: CloudEvent,
     geofencing_interface: GeofencingInterfaceDep,
 ) -> None:
     """Receive geofencing CloudEvent notifications from the CAMARA Geofencing service."""
     LOG.info(
-        "Received CAMARA geofencing callback for UE id=%s, camera id=%s: type=%s",
-        ue_id,
-        camera_id,
+        "Received CAMARA geofencing callback for UE supi=%s, camera supi=%s: type=%s",
+        ue_supi,
+        camera_supi,
         body.type,
     )
     data = body.data
     if isinstance(data, AreaEntered):
-        await geofencing_interface.register_in_camera_area(camera_id, ue_id)
-        LOG.info("UE id=%s entered camera id=%s area", ue_id, camera_id)
+        await geofencing_interface.register_in_camera_area(camera_supi, ue_supi)
+        LOG.info("UE supi=%s entered camera supi=%s area", ue_supi, camera_supi)
     elif isinstance(data, AreaLeft):
-        await geofencing_interface.unregister_from_camera_area(camera_id, ue_id)
-        LOG.info("UE id=%s left camera id=%s area", ue_id, camera_id)
+        await geofencing_interface.unregister_from_camera_area(camera_supi, ue_supi)
+        LOG.info("UE supi=%s left camera supi=%s area", ue_supi, camera_supi)

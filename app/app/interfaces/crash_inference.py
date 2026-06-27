@@ -12,8 +12,8 @@ class CrashInferenceInterface(ABC):
         self._redis = get_redis()
 
     @staticmethod
-    def _pipeline_key(camera_id: int) -> str:
-        return f"poc_crash_inference_{camera_id}"
+    def _pipeline_key(camera_supi: str) -> str:
+        return f"poc_crash_inference_{camera_supi}"
 
     @abstractmethod
     async def start_pipeline(self, camera: CameraUE) -> str | None:

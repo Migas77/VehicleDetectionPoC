@@ -16,10 +16,10 @@ LOG = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/nef/{ue_id}/{camera_id}/{subscription_id}")
+@router.post("/nef/{ue_supi}/{camera_supi}/{subscription_id}")
 async def nef_geofencing_callback(
-    ue_id: int,
-    camera_id: int,
+    ue_supi: str,
+    camera_supi: str,
     subscription_id: str,
     body: MonitoringNotification,
     geofencing_interface: GeofencingInterfaceDep,
@@ -28,36 +28,36 @@ async def nef_geofencing_callback(
     """Receive NEF LOCATION_REPORTING notifications and compute geofence enter/leave."""
     if not body.monitoringEventReports:
         LOG.warning(
-            "NEF geofencing callback for UE id=%s, sub=%s: no monitoring event reports",
-            ue_id,
+            "NEF geofencing callback for UE supi=%s, sub=%s: no monitoring event reports",
+            ue_supi,
             subscription_id,
         )
         return
     report = body.monitoringEventReports[0]
     if report.locationInfo is None or report.locationInfo.geographicArea is None:
         LOG.warning(
-            "NEF geofencing callback for UE id=%s, sub=%s: no location info",
-            ue_id,
+            "NEF geofencing callback for UE supi=%s, sub=%s: no location info",
+            ue_supi,
             subscription_id,
         )
         return
     geographic_area = report.locationInfo.geographicArea
     if geographic_area.shape != SupportedGADShapes.POINT:
         LOG.warning(
-            "NEF geofencing callback for UE id=%s, sub=%s: unsupported shape %s",
-            ue_id,
+            "NEF geofencing callback for UE supi=%s, sub=%s: unsupported shape %s",
+            ue_supi,
             subscription_id,
             geographic_area.shape,
         )
         return
     coordinates = geographic_area.point
 
-    key = GeofencingInterface.subscription_key(ue_id, subscription_id)
+    key = GeofencingInterface.subscription_key(ue_supi, subscription_id)
     raw = await redis.get(key)
     if raw is None:
         LOG.warning(
-            "NEF geofencing callback: no managed subscription for UE id=%s, sub=%s",
-            ue_id,
+            "NEF geofencing callback: no managed subscription for UE supi=%s, sub=%s",
+            ue_supi,
             subscription_id,
         )
         return
@@ -69,12 +69,12 @@ async def nef_geofencing_callback(
         return  # no transition
 
     if new_state == GeofenceState.INSIDE:
-        await geofencing_interface.register_in_camera_area(camera_id, ue_id)
-        LOG.info("UE id=%s entered camera id=%s area (NEF)", ue_id, camera_id)
+        await geofencing_interface.register_in_camera_area(camera_supi, ue_supi)
+        LOG.info("UE supi=%s entered camera supi=%s area (NEF)", ue_supi, camera_supi)
     elif managed.last_state == GeofenceState.INSIDE:
         # genuine INSIDE -> OUTSIDE transition
-        await geofencing_interface.unregister_from_camera_area(camera_id, ue_id)
-        LOG.info("UE id=%s left camera id=%s area (NEF)", ue_id, camera_id)
+        await geofencing_interface.unregister_from_camera_area(camera_supi, ue_supi)
+        LOG.info("UE supi=%s left camera supi=%s area (NEF)", ue_supi, camera_supi)
 
     managed.last_state = new_state
     await redis.set(key, managed.model_dump_json())

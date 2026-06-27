@@ -31,7 +31,7 @@ class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
                 ),
             ),
         )
-        LOG.info("Creating CAMARA ApplicationProfile for UE id=%s", ue.id)
+        LOG.info("Creating CAMARA ApplicationProfile for UE supi=%s", ue.supi)
         res = await self._client.post(
             "/application-profiles/v0.5/application-profiles",
             content=payload.model_dump_json(exclude_unset=True),
@@ -43,20 +43,20 @@ class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
             )
         profile = ApplicationProfile.model_validate_json(res.content)
         LOG.info(
-            "CAMARA ApplicationProfile created for UE id=%s, id=%s",
-            ue.id,
+            "CAMARA ApplicationProfile created for UE supi=%s, id=%s",
+            ue.supi,
             profile.applicationProfileId,
         )
         return profile
 
     async def get_application_profile(
         self,
-        ue_id: int,
+        ue_supi: str,
         application_profile_id: ApplicationProfileId | None = None,
     ) -> ApplicationProfile:
         if application_profile_id is None:
             raise RuntimeError(
-                f"CAMARA ApplicationProfile get requires application_profile_id for UE id={ue_id}"
+                f"CAMARA ApplicationProfile get requires application_profile_id for UE supi={ue_supi}"
             )
         res = await self._client.get(
             f"/application-profiles/v0.5/application-profiles/{application_profile_id}"

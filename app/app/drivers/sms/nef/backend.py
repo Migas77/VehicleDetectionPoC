@@ -19,7 +19,7 @@ class NefSMSBackend(SMSInterface):
     async def send_sms(self, ue: UE, text: str) -> None:
         if ue.msisdn is None:
             raise ValueError(
-                f"UE id={ue.id} has no MSISDN configured — cannot send SMS"
+                f"UE supi={ue.supi} has no MSISDN configured — cannot send SMS"
             )
 
         payload = SMSSendRequest(gpsi=f"msisdn-{ue.msisdn}", text=text)
@@ -31,4 +31,4 @@ class NefSMSBackend(SMSInterface):
         if not res.is_success:
             raise RuntimeError(f"NEF SMS send failed ({res.status_code}): {res.text}")
 
-        LOG.info("SMS sent to UE id=%s msisdn=%s", ue.id, ue.msisdn)
+        LOG.info("SMS sent to UE supi=%s msisdn=%s", ue.supi, ue.msisdn)

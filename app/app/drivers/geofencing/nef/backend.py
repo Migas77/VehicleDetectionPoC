@@ -46,7 +46,7 @@ class NefGeofencingBackend(GeofencingInterface):
         managed_id = str(uuid4())
         notification_url = (
             f"{str(settings.nef.poc_notification_url).rstrip('/')}"
-            f"/callbacks/geofencing/nef/{ue.id}/{area.camera_id}/{managed_id}"
+            f"/callbacks/geofencing/nef/{ue.supi}/{area.camera_supi}/{managed_id}"
         )
         if ue.msisdn is not None:
             payload = MonitoringEventSubscription(
@@ -66,15 +66,15 @@ class NefGeofencingBackend(GeofencingInterface):
             )
         else:
             raise ValueError(
-                f"Cannot identify UE id={ue.id} for NEF geofencing: "
+                f"Cannot identify UE supi={ue.supi} for NEF geofencing: "
                 "neither msisdn nor ip_address_v4 is set"
             )
 
         url = f"/nef/api/v1/3gpp-monitoring-event/v1/{settings.poc_af_id}/subscriptions"
         LOG.info(
-            "Creating NEF geofencing (location) subscription for UE id=%s, camera id=%s",
-            ue.id,
-            area.camera_id,
+            "Creating NEF geofencing (location) subscription for UE supi=%s, camera supi=%s",
+            ue.supi,
+            area.camera_supi,
         )
         res = await self._client.post(
             url,
@@ -88,22 +88,22 @@ class NefGeofencingBackend(GeofencingInterface):
         subscription = MonitoringEventSubscription.model_validate_json(res.content)
         if subscription.self is None:
             raise RuntimeError(
-                f"NEF geofencing subscription response missing 'self' link for UE id={ue.id}"
+                f"NEF geofencing subscription response missing 'self' link for UE supi={ue.supi}"
             )
         managed = ManagedGeofencingSubscription(
             subscription_id=managed_id,
-            ue_id=ue.id,
+            ue_supi=ue.supi,
             area=area,
             types=_GEOFENCING_EVENT_TYPES,
             nef_subscription_url=str(subscription.self),
             last_state=None,
         )
         await self._redis.set(
-            self.subscription_key(ue.id, managed_id), managed.model_dump_json()
+            self.subscription_key(ue.supi, managed_id), managed.model_dump_json()
         )
         LOG.info(
-            "NEF geofencing subscription created for UE id=%s, subscriptionId=%s",
-            ue.id,
+            "NEF geofencing subscription created for UE supi=%s, subscriptionId=%s",
+            ue.supi,
             managed_id,
         )
         return [managed_id]
@@ -111,7 +111,7 @@ class NefGeofencingBackend(GeofencingInterface):
     async def delete_geofencing_subscription(
         self, ue: UE, subscription_id: str
     ) -> bool:
-        key = self.subscription_key(ue.id, subscription_id)
+        key = self.subscription_key(ue.supi, subscription_id)
         raw = await self._redis.get(key)
         if raw is None:
             LOG.warning(

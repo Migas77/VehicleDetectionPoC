@@ -12,7 +12,7 @@ from app.settings import settings
 LOG = logging.getLogger(__name__)
 
 
-def _build_workflow_specification(camera_id: int) -> dict[str, object]:
+def _build_workflow_specification(camera_supi: str) -> dict[str, object]:
     return {
         "version": "1.0",
         "inputs": [
@@ -47,7 +47,7 @@ def _build_workflow_specification(camera_id: int) -> dict[str, object]:
             {
                 "type": "roboflow_core/webhook_sink@v1",
                 "name": "webhook",
-                "url": f"{str(settings.crash_inference.poc_notification_url).rstrip('/')}{callbacks_router.prefix}/{camera_id}",
+                "url": f"{str(settings.crash_inference.poc_notification_url).rstrip('/')}{callbacks_router.prefix}/{camera_supi}",
                 "method": "POST",
                 "headers": {"Content-Type": "application/json"},
                 "json_payload": {
@@ -116,16 +116,16 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
         )
 
     async def start_pipeline(self, camera: CameraUE) -> str | None:
-        inference_config = settings.cameras.get_inference_config_by_ue_id(camera.id)
+        inference_config = settings.cameras.get_inference_config_by_ue_supi(camera.supi)
         if not inference_config.inference_enabled:
-            LOG.debug("Inference not enabled for camera id=%s, skipping", camera.id)
+            LOG.debug("Inference not enabled for camera supi=%s, skipping", camera.supi)
             return None
 
         # validator guarantees video_reference is set when inference_enabled=True
         video_reference = inference_config.video_reference
         LOG.info(
-            "Starting crash inference pipeline (camera_id=%s, model=%s, video=%s)",
-            camera.id,
+            "Starting crash inference pipeline (camera_supi=%s, model=%s, video=%s)",
+            camera.supi,
             settings.crash_inference.model_id,
             video_reference,
         )
@@ -138,7 +138,7 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
             },
             "processing_configuration": {
                 "type": "WorkflowConfiguration",
-                "workflow_specification": _build_workflow_specification(camera.id),
+                "workflow_specification": _build_workflow_specification(camera.supi),
             },
             "sink_configuration": {
                 "type": "MemorySinkConfiguration",
@@ -147,33 +147,33 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
         res = await self._client.post("/inference_pipelines/initialise", json=payload)
         if not res.is_success:
             raise RuntimeError(
-                f"Failed to start inference pipeline for camera id={camera.id} "
+                f"Failed to start inference pipeline for camera supi={camera.supi} "
                 f"({res.status_code}): {res.text}"
             )
 
         data = res.json()
         pipeline_id: str = data["context"]["pipeline_id"]
-        await self._redis.set(self._pipeline_key(camera.id), pipeline_id)
+        await self._redis.set(self._pipeline_key(camera.supi), pipeline_id)
         LOG.info(
-            "Crash inference pipeline started, camera_id=%s, pipeline_id=%s",
-            camera.id,
+            "Crash inference pipeline started, camera_supi=%s, pipeline_id=%s",
+            camera.supi,
             pipeline_id,
         )
         return pipeline_id
 
     async def terminate_pipeline(self, camera: CameraUE) -> None:
         pipeline_id = cast(
-            str | None, await self._redis.get(self._pipeline_key(camera.id))
+            str | None, await self._redis.get(self._pipeline_key(camera.supi))
         )
         if pipeline_id is None:
             LOG.warning(
-                "No running inference pipeline found for camera id=%s", camera.id
+                "No running inference pipeline found for camera supi=%s", camera.supi
             )
             return
         LOG.info(
-            "Terminating crash inference pipeline id=%s for camera id=%s",
+            "Terminating crash inference pipeline id=%s for camera supi=%s",
             pipeline_id,
-            camera.id,
+            camera.supi,
         )
 
         res = await self._client.post(
@@ -185,9 +185,9 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
                 f"({res.status_code}): {res.text}"
             )
 
-        await self._redis.delete(self._pipeline_key(camera.id))
+        await self._redis.delete(self._pipeline_key(camera.supi))
         LOG.info(
-            "Crash inference pipeline terminated, camera_id=%s, pipeline_id=%s",
-            camera.id,
+            "Crash inference pipeline terminated, camera_supi=%s, pipeline_id=%s",
+            camera.supi,
             pipeline_id,
         )

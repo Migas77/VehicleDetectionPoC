@@ -18,17 +18,17 @@ _DEBOUNCE_KEY_PREFIX = "poc_crash_inference_debounce_"
 _STREAK_KEY_PREFIX = "poc_crash_inference_streak_"
 
 
-@router.post("/{ue_id}", status_code=204)
+@router.post("/{ue_supi}", status_code=204)
 async def crash_inference_webhook(
-    ue_id: int, body: dict[str, Any], redis: RedisDep
+    ue_supi: str, body: dict[str, Any], redis: RedisDep
 ) -> Response:
     """Receive Roboflow inference webhook. Returns 204 immediately; processing runs in background."""
-    asyncio.create_task(_process_detection(ue_id, body, redis))
+    asyncio.create_task(_process_detection(ue_supi, body, redis))
     return Response(status_code=204)
 
 
 async def _process_detection(
-    ue_id: int, payload: dict[str, Any], redis: aioredis.Redis
+    ue_supi: str, payload: dict[str, Any], redis: aioredis.Redis
 ) -> None:
 
     detections_number: int = payload.get("detections_number", 0)
@@ -40,11 +40,11 @@ async def _process_detection(
         payload,
     )
 
-    streak_key = f"{_STREAK_KEY_PREFIX}{ue_id}"
+    streak_key = f"{_STREAK_KEY_PREFIX}{ue_supi}"
     if frame_number is None:
         LOG.error(
-            "Inference payload for camera id=%s has no frame_number",
-            ue_id,
+            "Inference payload for camera supi=%s has no frame_number",
+            ue_supi,
         )
         return
     if detections_number == 0:
@@ -64,18 +64,18 @@ async def _process_detection(
         await redis.delete(streak_key)
         return
 
-    debounce_key = f"{_DEBOUNCE_KEY_PREFIX}{ue_id}"
+    debounce_key = f"{_DEBOUNCE_KEY_PREFIX}{ue_supi}"
     if await redis.exists(debounce_key):
         LOG.debug(
-            "Intervention debounced for camera id=%s on frame %s (debounce=%.1fs)",
-            ue_id,
+            "Intervention debounced for camera supi=%s on frame %s (debounce=%.1fs)",
+            ue_supi,
             frame_number,
             settings.crash_inference.debounce_seconds,
         )
         return
 
     # Require the crash detection to persist across crash_window_size frames
-    max_fps = settings.cameras.get_inference_config_by_ue_id(ue_id).max_fps
+    max_fps = settings.cameras.get_inference_config_by_ue_supi(ue_supi).max_fps
     required_span = settings.crash_inference.crash_window_size(max_fps)
     first_frame = await redis.get(streak_key)
     if first_frame is None:
@@ -95,12 +95,12 @@ async def _process_detection(
     await redis.delete(streak_key)
     LOG.warning(
         "Intervention triggered: crash persisted across frames %s..%s (span %d >= %d) "
-        "for camera id=%s (classes=%s)",
+        "for camera supi=%s (classes=%s)",
         first_frame,
         frame_number,
         span,
         required_span,
-        ue_id,
+        ue_supi,
         [p["class"] for p in matching],
     )
     # TODO: implement crash detection handling (i.e. send sms to pedestrians and message to UEs)

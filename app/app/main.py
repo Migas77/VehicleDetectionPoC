@@ -42,7 +42,7 @@ async def _verify_camera_qos_profiles(
         valid = await qos_profiles_interface.verify_qos_profile(camera)
         if not valid:
             raise RuntimeError(
-                f"QoS profile verification failed for camera UE '{camera.name}' (id={camera.id})"
+                f"QoS profile verification failed for camera UE '{camera.name}' (supi={camera.supi})"
             )
 
     LOG.info("QoS profile verification passed for %d camera(s)", len(camera_ues))
@@ -58,8 +58,8 @@ async def _cleanup_stale_camera_qod_provisioning(
         )
         if provisioning_id is not None:
             LOG.warning(
-                "Stale QoD provisioning found for camera UE id=%s (provisioningId=%s), deleting",
-                camera.id,
+                "Stale QoD provisioning found for camera UE supi=%s (provisioningId=%s), deleting",
+                camera.supi,
                 provisioning_id,
             )
             await qod_provisioning_interface.delete_qod_provisioning(provisioning_id)
@@ -111,17 +111,18 @@ def _build_camera_surveyed_area(camera: CameraUE) -> SurveyedArea | None:
     """Build the surveyed area for a camera from settings + its live location."""
     if camera.latitude is None or camera.longitude is None:
         LOG.warning(
-            "Camera UE id=%s has no location, skipping geofencing area", camera.id
+            "Camera UE supi=%s has no location, skipping geofencing area", camera.supi
         )
         return None
-    cfg = settings.cameras.get_area_by_ue_id(camera.id)
+    cfg = settings.cameras.get_area_by_ue_supi(camera.supi)
     if cfg is None:
         LOG.warning(
-            "No surveyed area assignment for camera UE id=%s, using default", camera.id
+            "No surveyed area assignment for camera UE supi=%s, using default",
+            camera.supi,
         )
         cfg = settings.cameras.default_surveyed_area
     return SurveyedArea(
-        camera_id=camera.id,
+        camera_supi=camera.supi,
         center=Point(latitude=camera.latitude, longitude=camera.longitude),
         radius=cfg.radius,
         points=cfg.points,
@@ -161,7 +162,7 @@ async def _cleanup_pedestrian_geofencing(
             )
             deleted += 1
     for camera in camera_ues:
-        await geofencing_interface.clear_camera_area_subscribers(camera.id)
+        await geofencing_interface.clear_camera_area_subscribers(camera.supi)
     LOG.info("Geofencing subscriptions deleted: %d", deleted)
 
 

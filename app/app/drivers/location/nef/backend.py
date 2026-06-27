@@ -49,7 +49,7 @@ class NefLocationBackend(LocationInterface):
             )
         else:
             raise ValueError(
-                f"Cannot identify UE id={ue.id} for NEF: "
+                f"Cannot identify UE supi={ue.supi} for NEF: "
                 "neither ip_address_v4 nor msisdn is set"
             )
 
@@ -64,20 +64,22 @@ class NefLocationBackend(LocationInterface):
                 f"NEF location retrieval failed ({res.status_code}): {res.text}"
             )
         data = _dict_adapter.validate_json(res.content)
-        location = self._parse_location(data, ue.id)
+        location = self._parse_location(data, ue.supi)
         return location
 
     @staticmethod
-    def _parse_location(data: dict[str, Any], ue_id: int) -> Location:
+    def _parse_location(data: dict[str, Any], ue_supi: str) -> Location:
         """Map a NEF MonitoringEvent subscription response to a CAMARA Location."""
         location_info = data.get("locationInfo")
         if location_info is None:
-            raise RuntimeError(f"NEF response missing 'locationInfo' for UE id={ue_id}")
+            raise RuntimeError(
+                f"NEF response missing 'locationInfo' for UE supi={ue_supi}"
+            )
 
         area = location_info.get("geographicArea")
         if area is None:
             raise RuntimeError(
-                f"NEF response missing 'locationInfo.geographicArea' for UE id={ue_id}"
+                f"NEF response missing 'locationInfo.geographicArea' for UE supi={ue_supi}"
             )
 
         shape = area.get("shape")
@@ -99,5 +101,5 @@ class NefLocationBackend(LocationInterface):
             )
 
         raise RuntimeError(
-            f"Unsupported NEF geographicArea shape '{shape}' for UE id={ue_id}"
+            f"Unsupported NEF geographicArea shape '{shape}' for UE supi={ue_supi}"
         )

@@ -30,7 +30,7 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
     async def assign_qos_profile(self, ue: UeWithQoS) -> str:
         notification_dest = (
             f"{str(settings.nef.poc_notification_url).rstrip('/')}"
-            f"/callbacks/qod-provisioning/nef/{ue.id}"
+            f"/callbacks/qod-provisioning/nef/{ue.supi}"
         )
 
         if ue.ip_address_v4 is not None:
@@ -49,14 +49,14 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
             )
         else:
             raise ValueError(
-                f"Cannot identify UE id={ue.id} for NEF: "
+                f"Cannot identify UE supi={ue.supi} for NEF: "
                 "neither ip_address_v4 nor msisdn is set"
             )
 
         url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions"
         LOG.info(
-            "Creating NEF AsSessionWithQoS subscription for UE id=%s, qosRef=%s",
-            ue.id,
+            "Creating NEF AsSessionWithQoS subscription for UE supi=%s, qosRef=%s",
+            ue.supi,
             ue.qos_profile.qos_profile_name,
         )
         res = await self._client.post(
@@ -71,12 +71,12 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
         subscription = AsSessionWithQoSSubscription.model_validate_json(res.content)
         if subscription.self is None:
             raise RuntimeError(
-                f"NEF subscription response missing 'self' link for UE id={ue.id}"
+                f"NEF subscription response missing 'self' link for UE supi={ue.supi}"
             )
         sub_id = self._extract_subscription_id(str(subscription.self))
         LOG.info(
-            "NEF subscription created for UE id=%s, subscriptionId=%s",
-            ue.id,
+            "NEF subscription created for UE supi=%s, subscriptionId=%s",
+            ue.supi,
             sub_id,
         )
         return sub_id

@@ -18,12 +18,12 @@ class ApplicationProfilesInterface(ABC):
     @abstractmethod
     async def get_application_profile(
         self,
-        ue_id: int,
+        ue_supi: str,
         application_profile_id: ApplicationProfileId | None = None,
     ) -> ApplicationProfile:
         """Return the application profile for the UE.
 
-        For NEF: derives the profile from settings using ue_id (application_profile_id is ignored).
+        For NEF: derives the profile from settings using ue_supi (application_profile_id is ignored).
         For CAMARA: fetches by application_profile_id from the API (raises if id is None).
         """
 

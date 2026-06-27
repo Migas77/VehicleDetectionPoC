@@ -3,20 +3,20 @@ QCI_1_voice = {qos_profile_name = "QCI_1_voice", min_ul_bitrate = "50 Kbps", max
 QCI_2_voice = {qos_profile_name = "QCI_2_voice", min_ul_bitrate = "200 Kbps", max_ul_bitrate = "400 Kbps", min_dl_bitrate = "200 Kbps", max_dl_bitrate = "400 Kbps"}
 
 [cameras.qos_profiles_assignment]
-# Apart from default profile, the keys follow the initialization order in nef_db_init.sh
-default = "QCI_1_voice"
-1       = "QCI_2_voice"
-2       = "QCI_2_voice"
+# Apart from default, the keys are UE supi values (see nef_db_init.sh).
+default              = "QCI_1_voice"
+"202010000000006"    = "QCI_2_voice"  # scamera-1
+"202010000000007"    = "QCI_2_voice"  # dcamera-1
 
 [cameras.surveyed_areas]
-# Apart from default profile, the keys follow the initialization order in nef_db_init.sh
-# Geofencing area per camera UE id (radius in metres; optional polygon points for the NEF backend).
+# Apart from default, the keys are UE supi values (see nef_db_init.sh).
+# Geofencing area per camera UE supi (radius in metres; optional polygon points for the NEF backend).
 # The circle center is the camera's live location; radius is always used by the CAMARA backend.
-default = {radius = 300}
-1       = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}
-2       = {radius = 200}
+default              = {radius = 300}
+"202010000000006"    = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}  # scamera-1
+"202010000000007"    = {radius = 200}  # dcamera-1
 
 [cameras.inference]
-# Apart from default, the keys follow the initialization order in nef_db_init.sh
-default = {inference_enabled = false}
-1       = {inference_enabled = true, video_reference = "rtsp://192.168.0.180:8554/mystream", max_fps = 15}
+# Apart from default, the keys are UE supi values (see nef_db_init.sh).
+default              = {inference_enabled = false}
+"202010000000006"    = {inference_enabled = true, video_reference = "rtsp://192.168.0.180:8554/mystream", max_fps = 15}  # scamera-1

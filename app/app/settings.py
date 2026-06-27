@@ -69,15 +69,13 @@ class CameraInferenceConfig(BaseModel):
 
 class CamerasSettings(BaseModel):
     qos_profiles: dict[str, QosProfile]  # {profile_name : QosProfile}
-    qos_profiles_assignment: dict[
-        str, str
-    ]  # {"default" / str(NEF UE db id) : profile_name}
+    qos_profiles_assignment: dict[str, str]  # {"default" / ue_supi : profile_name}
     surveyed_areas: dict[
         str, SurveyedAreaConfig
-    ]  # {"default" / str(NEF UE db id) : SurveyedAreaConfig}
+    ]  # {"default" / ue_supi : SurveyedAreaConfig}
     inference: dict[str, CameraInferenceConfig] = Field(
         default_factory=dict
-    )  # {"default" / str(NEF UE db id) : CameraInferenceConfig}
+    )  # {"default" / ue_supi : CameraInferenceConfig}
 
     @model_validator(mode="after")
     def _validate_qos_profile_assignments(self) -> "CamerasSettings":
@@ -101,8 +99,8 @@ class CamerasSettings(BaseModel):
     def default_qos_profile(self) -> QosProfile:
         return self.qos_profiles[self.qos_profiles_assignment["default"]]
 
-    def get_by_ue_id(self, ue_id: int) -> QosProfile | None:
-        name = self.qos_profiles_assignment.get(str(ue_id))
+    def get_by_ue_supi(self, ue_supi: str) -> QosProfile | None:
+        name = self.qos_profiles_assignment.get(ue_supi)
         if name is None:
             return None
         return self.qos_profiles[name]  # validator guarantees name exists
@@ -111,12 +109,12 @@ class CamerasSettings(BaseModel):
     def default_surveyed_area(self) -> SurveyedAreaConfig:
         return self.surveyed_areas["default"]  # validator guarantees presence
 
-    def get_area_by_ue_id(self, ue_id: int) -> SurveyedAreaConfig | None:
-        return self.surveyed_areas.get(str(ue_id))
+    def get_area_by_ue_supi(self, ue_supi: str) -> SurveyedAreaConfig | None:
+        return self.surveyed_areas.get(ue_supi)
 
-    def get_inference_config_by_ue_id(self, ue_id: int) -> CameraInferenceConfig:
+    def get_inference_config_by_ue_supi(self, ue_supi: str) -> CameraInferenceConfig:
         return (
-            self.inference.get(str(ue_id))
+            self.inference.get(ue_supi)
             or self.inference.get("default")
             or CameraInferenceConfig()
         )

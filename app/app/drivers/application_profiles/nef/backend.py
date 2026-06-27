@@ -22,12 +22,14 @@ class NefApplicationProfilesBackend(ApplicationProfilesInterface):
 
     async def get_application_profile(
         self,
-        ue_id: int,
+        ue_supi: str,
         application_profile_id: ApplicationProfileId | None = None,
     ) -> ApplicationProfile:
-        qos_profile = settings.cameras.get_by_ue_id(ue_id)
+        qos_profile = settings.cameras.get_by_ue_supi(ue_supi)
         if qos_profile is None:
-            LOG.warning("UE id=%s not found in camera settings, using default", ue_id)
+            LOG.warning(
+                "UE supi=%s not found in camera settings, using default", ue_supi
+            )
             qos_profile = settings.cameras.default_qos_profile
         return ApplicationProfile(
             applicationProfileId=uuid.uuid4(),

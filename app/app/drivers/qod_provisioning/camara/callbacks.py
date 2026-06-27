@@ -9,13 +9,13 @@ LOG = logging.getLogger(__name__)
 router = APIRouter()
 
 
-@router.post("/camara/{ue_id}")
-async def camara_qos_callback(ue_id: int, body: CloudEvent) -> None:
+@router.post("/camara/{ue_supi}")
+async def camara_qos_callback(ue_supi: str, body: CloudEvent) -> None:
     """Receive CloudEvent status-changed notifications from the CAMARA gateway for a given UE."""
     LOG.info(
-        "Received CAMARA QoD provisioning callback for UE id=%s: "
+        "Received CAMARA QoD provisioning callback for UE supi=%s: "
         "type=%s, provisioningId=%s, status=%s",
-        ue_id,
+        ue_supi,
         body.type,
         body.data.provisioningId,
         body.data.status,

@@ -60,7 +60,7 @@ class CamaraGeofencingBackend(GeofencingInterface):
         ipv6 = IPv6Address(ue.ip_address_v6) if ue.ip_address_v6 else None
         if phone is None and ipv4 is None and ipv6 is None:
             raise ValueError(
-                f"Cannot identify device for UE id={ue.id} for geofencing subscription: "
+                f"Cannot identify device for UE supi={ue.supi} for geofencing subscription: "
                 "msisdn, ip_address_v4 or ip_address_v6 is required"
             )
         return Device(phoneNumber=phone, ipv4Address=ipv4, ipv6Address=ipv6)
@@ -68,7 +68,7 @@ class CamaraGeofencingBackend(GeofencingInterface):
     async def create_geofencing_subscription(
         self, ue: UE, area: SurveyedArea
     ) -> list[str]:
-        sink = f"{self._notification_url}/callbacks/geofencing/camara/{ue.id}/{area.camera_id}"
+        sink = f"{self._notification_url}/callbacks/geofencing/camara/{ue.supi}/{area.camera_supi}"
         detail = SubscriptionDetail(
             device=self._build_device(ue),
             area=Circle(
@@ -84,9 +84,9 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 config=SubscriptionConfig(subscriptionDetail=detail),
             )
             LOG.info(
-                "Creating CAMARA geofencing subscription for UE id=%s, camera id=%s, type=%s",
-                ue.id,
-                area.camera_id,
+                "Creating CAMARA geofencing subscription for UE supi=%s, camera supi=%s, type=%s",
+                ue.supi,
+                area.camera_supi,
                 event_type.value,
             )
             res = await self._client.post(
@@ -100,11 +100,11 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 )
             subscription = SubscriptionTypeAdapter.validate_json(res.content)
             sub_id = subscription.id
-            await self._redis.set(self.subscription_key(ue.id, sub_id), sub_id)
+            await self._redis.set(self.subscription_key(ue.supi, sub_id), sub_id)
             subscription_ids.append(sub_id)
             LOG.info(
-                "CAMARA geofencing subscription created for UE id=%s, subscriptionId=%s",
-                ue.id,
+                "CAMARA geofencing subscription created for UE supi=%s, subscriptionId=%s",
+                ue.supi,
                 sub_id,
             )
         return subscription_ids
@@ -121,12 +121,12 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 "CAMARA geofencing subscription id=%s not found for deletion",
                 subscription_id,
             )
-            await self._redis.delete(self.subscription_key(ue.id, subscription_id))
+            await self._redis.delete(self.subscription_key(ue.supi, subscription_id))
             return False
         if not res.is_success:
             raise RuntimeError(
                 f"CAMARA geofencing subscription delete failed ({res.status_code}): {res.text}"
             )
-        await self._redis.delete(self.subscription_key(ue.id, subscription_id))
+        await self._redis.delete(self.subscription_key(ue.supi, subscription_id))
         LOG.info("CAMARA geofencing subscription id=%s deleted", subscription_id)
         return True

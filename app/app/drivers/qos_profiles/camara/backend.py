@@ -45,7 +45,7 @@ class CamaraQoSProfilesBackend(QoSProfilesInterface):
 
     async def verify_qos_profile(self, ue: UeWithQoS) -> bool:
         name = ue.qos_profile.qos_profile_name
-        LOG.info("Verifying CAMARA QoS profile '%s' for UE id=%s", name, ue.id)
+        LOG.info("Verifying CAMARA QoS profile '%s' for UE supi=%s", name, ue.supi)
         res = await self._client.get(f"/qos-profiles/v1/qos-profiles/{name}")
         if res.status_code == 404:
             LOG.warning("CAMARA QoS profile '%s' not found", name)

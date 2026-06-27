@@ -18,6 +18,9 @@ class CamaraLocationBackend(LocationInterface):
 
     @staticmethod
     def _build_device(ue: UE) -> Device:
+        if ue.msisdn is not None:
+            phone = ue.msisdn if ue.msisdn.startswith("+") else f"+{ue.msisdn}"
+            return Device(phoneNumber=phone)
         if ue.ip_address_v4 is not None:
             ip = IPv4Address(ue.ip_address_v4)
             return Device(
@@ -26,17 +29,14 @@ class CamaraLocationBackend(LocationInterface):
                     privateAddress=ip,
                 )
             )
-        if ue.msisdn is not None:
-            phone = ue.msisdn if ue.msisdn.startswith("+") else f"+{ue.msisdn}"
-            return Device(phoneNumber=phone)
         raise ValueError(
-            f"Cannot identify device for UE id={ue.id}: "
+            f"Cannot identify device for UE supi={ue.supi}: "
             "neither ip_address_v4 nor msisdn is set"
         )
 
     async def retrieve_location(self, ue: UE) -> Location:
         payload = RetrievalLocationRequest(device=self._build_device(ue))
-        LOG.info("Retrieving CAMARA location for UE id=%s", ue.id)
+        LOG.info("Retrieving CAMARA location for UE supi=%s", ue.supi)
         res = await self._client.post(
             "/location-retrieval/v0.4/retrieve",
             content=payload.model_dump_json(exclude_unset=True),
@@ -48,8 +48,8 @@ class CamaraLocationBackend(LocationInterface):
             )
         location = Location.model_validate_json(res.content)
         LOG.info(
-            "CAMARA location retrieved for UE id=%s: areaType=%s",
-            ue.id,
+            "CAMARA location retrieved for UE supi=%s: areaType=%s",
+            ue.supi,
             location.area.areaType,
         )
         return location

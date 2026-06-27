@@ -27,33 +27,33 @@ _REQUIREMENTS_UNMET = (
 )
 
 
-@router.post("/nef/{ue_id}")
+@router.post("/nef/{ue_supi}")
 async def nef_analytics_callback(
-    ue_id: int,
+    ue_supi: str,
     body: AnalyticsEventNotification,
     application_profiles_interface: ApplicationProfilesInterfaceDep,
 ) -> None:
     """Receive WLAN_PERFORMANCE analytics notifications from the NEF."""
     notif_id = body.notifId
     LOG.info(
-        "Received NEF analytics callback for UE id=%s, notifId=%s", ue_id, notif_id
+        "Received NEF analytics callback for UE supi=%s, notifId=%s", ue_supi, notif_id
     )
 
     if body.termCause is not None:
         LOG.warning(
-            "UE id=%s, notifId=%s: Analytics subscription terminated, cause=%s",
-            ue_id,
+            "UE supi=%s, notifId=%s: Analytics subscription terminated, cause=%s",
+            ue_supi,
             notif_id,
             body.termCause,
         )
         return
 
-    profile = await application_profiles_interface.get_application_profile(ue_id)
+    profile = await application_profiles_interface.get_application_profile(ue_supi)
     thresholds = profile.networkQualityThresholds
     if thresholds is None or not thresholds.model_dump(exclude_none=True):
         LOG.info(
-            "UE id=%s, notifId=%s: Empty/None thresholds for profile %s, skipping",
-            ue_id,
+            "UE supi=%s, notifId=%s: Empty/None thresholds for profile %s, skipping",
+            ue_supi,
             notif_id,
             profile.applicationProfileId,
         )
@@ -70,8 +70,8 @@ async def nef_analytics_callback(
     if notif.analyEvent != AnalyticsEvent.WLAN_PERFORMANCE:
         # should never happen (subscription is for WLAN_PERFORMANCE only)
         LOG.warning(
-            "UE id=%s, notifId=%s: Unsupported event %s (not WLAN_PERFORMANCE), ignoring",
-            ue_id,
+            "UE supi=%s, notifId=%s: Unsupported event %s (not WLAN_PERFORMANCE), ignoring",
+            ue_supi,
             notif_id,
             notif.analyEvent,
         )
@@ -79,8 +79,8 @@ async def nef_analytics_callback(
     if not notif.wlanInfos:
         # should never happen (NEF returning empty wlanInfos)
         LOG.warning(
-            "UE id=%s, notifId=%s: wlanInfos empty/none for WLAN_PERFORMANCE notification",
-            ue_id,
+            "UE supi=%s, notifId=%s: wlanInfos empty/none for WLAN_PERFORMANCE notification",
+            ue_supi,
             notif_id,
         )
         return
@@ -89,8 +89,8 @@ async def nef_analytics_callback(
     if len(notif.wlanInfos) != 1:
         # should never happen
         LOG.warning(
-            "UE id=%s, notifId=%s: Received %d wlanInfos, expected 1. Processing first one.",
-            ue_id,
+            "UE supi=%s, notifId=%s: Received %d wlanInfos, expected 1. Processing first one.",
+            ue_supi,
             notif_id,
             len(notif.wlanInfos),
         )
@@ -112,8 +112,8 @@ async def nef_analytics_callback(
     if ue_info is None:
         # should never happen (missing UE info — no traffic UEs will return zeroed metric values)
         LOG.warning(
-            "UE id=%s, notifId=%s: No matching UE info found in WLAN_PERFORMANCE notification, skipping",
-            ue_id,
+            "UE supi=%s, notifId=%s: No matching UE info found in WLAN_PERFORMANCE notification, skipping",
+            ue_supi,
             notif_id,
         )
         return
@@ -125,8 +125,8 @@ async def nef_analytics_callback(
         )
         if not traffic:
             LOG.warning(
-                "UE id=%s, notifId=%s: Missing traffic information in ts_info, skipping",
-                ue_id,
+                "UE supi=%s, notifId=%s: Missing traffic information in ts_info, skipping",
+                ue_supi,
                 notif_id,
             )
             continue
@@ -136,8 +136,8 @@ async def nef_analytics_callback(
             break
 
     LOG.info(
-        "UE id=%s, notifId=%s: analytics SLA check — UL=%s, DL=%s",
-        ue_id,
+        "UE supi=%s, notifId=%s: analytics SLA check — UL=%s, DL=%s",
+        ue_supi,
         notif_id,
         insight.targetMinUpstreamRate,
         insight.targetMinDownstreamRate,

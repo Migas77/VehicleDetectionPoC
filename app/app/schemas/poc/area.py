@@ -14,7 +14,7 @@ class SurveyedArea(BaseModel):
     may additionally use ``points`` to refine the geofence into a polygon.
     """
 
-    camera_id: int  # owning camera UE id — used in callback URLs + occupant set
+    camera_supi: str  # owning camera UE supi — used in callback URLs + occupant set
     center: Point  # camera location (lat/long); CAMARA Circle center
     radius: Annotated[int, Field(ge=1, le=200000)]  # metres; CAMARA Circle radius
     points: list[Point] | None = None  # optional polygon vertices (NEF refinement)

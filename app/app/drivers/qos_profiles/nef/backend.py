@@ -36,7 +36,7 @@ class NefQoSProfilesBackend(QoSProfilesInterface):
 
     async def verify_qos_profile(self, ue: UeWithQoS) -> bool:
         name = ue.qos_profile.qos_profile_name
-        LOG.info("Verifying NEF QoS profile '%s' for UE id=%s", name, ue.id)
+        LOG.info("Verifying NEF QoS profile '%s' for UE supi=%s", name, ue.supi)
         res = await self._client.get(f"/api/v1/qosInfo/qosCharacteristics/{name}")
         if res.status_code == 404:
             LOG.warning("NEF QoS profile '%s' not found", name)

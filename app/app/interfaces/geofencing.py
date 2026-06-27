@@ -14,14 +14,14 @@ class GeofencingInterface(ABC):
         self._redis = get_redis()
 
     @staticmethod
-    def subscription_key(ue_id: int, subscription_id: str) -> str:
+    def subscription_key(ue_supi: str, subscription_id: str) -> str:
         """Build the Redis key under which a UE's geofencing subscription is stored."""
-        return f"poc_geofencing_{ue_id}_{subscription_id}"
+        return f"poc_geofencing_{ue_supi}_{subscription_id}"
 
     @staticmethod
-    def crash_subscribers_key(camera_id: int) -> str:
+    def crash_subscribers_key(camera_supi: str) -> str:
         """Build the Redis key for the set of pedestrians currently inside a camera's area."""
-        return f"poc_camera_crash_subscribers_{camera_id}"
+        return f"poc_camera_crash_subscribers_{camera_supi}"
 
     @abstractmethod
     async def create_geofencing_subscription(
@@ -55,29 +55,29 @@ class GeofencingInterface(ABC):
         self, ue: UE, subscription_id: str
     ) -> str | None:
         """Return the stored value for a geofencing subscription, or None if absent."""
-        result = await self._redis.get(self.subscription_key(ue.id, subscription_id))
+        result = await self._redis.get(self.subscription_key(ue.supi, subscription_id))
         return cast("str | None", result)
 
     async def get_all_geofencing_subscriptions(self, ue: UE) -> list[str]:
         """Return all stored geofencing subscription ids for the given UE."""
-        prefix = f"poc_geofencing_{ue.id}_"
+        prefix = f"poc_geofencing_{ue.supi}_"
         keys = await self._redis.keys(f"{prefix}*")
         # the subscription id is the key suffix (the stored value differs per backend)
         return [cast(str, key)[len(prefix) :] for key in keys]
 
-    async def register_in_camera_area(self, camera_id: int, ue_id: int) -> None:
+    async def register_in_camera_area(self, camera_supi: str, ue_supi: str) -> None:
         """Record that a pedestrian UE entered a camera's area (crash-notification set)."""
-        await self._redis.sadd(self.crash_subscribers_key(camera_id), ue_id)
+        await self._redis.sadd(self.crash_subscribers_key(camera_supi), ue_supi)
 
-    async def unregister_from_camera_area(self, camera_id: int, ue_id: int) -> None:
+    async def unregister_from_camera_area(self, camera_supi: str, ue_supi: str) -> None:
         """Record that a pedestrian UE left a camera's area."""
-        await self._redis.srem(self.crash_subscribers_key(camera_id), ue_id)
+        await self._redis.srem(self.crash_subscribers_key(camera_supi), ue_supi)
 
-    async def get_camera_area_subscribers(self, camera_id: int) -> set[str]:
-        """Return the pedestrian UE ids currently inside a camera's area."""
-        result = await self._redis.smembers(self.crash_subscribers_key(camera_id))
+    async def get_camera_area_subscribers(self, camera_supi: str) -> set[str]:
+        """Return the pedestrian UE supis currently inside a camera's area."""
+        result = await self._redis.smembers(self.crash_subscribers_key(camera_supi))
         return cast("set[str]", result)
 
-    async def clear_camera_area_subscribers(self, camera_id: int) -> None:
+    async def clear_camera_area_subscribers(self, camera_supi: str) -> None:
         """Clear the set of pedestrians inside a camera's area."""
-        await self._redis.delete(self.crash_subscribers_key(camera_id))
+        await self._redis.delete(self.crash_subscribers_key(camera_supi))
