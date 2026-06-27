@@ -16,12 +16,12 @@ class GeofencingInterface(ABC):
     @staticmethod
     def subscription_key(ue_supi: str, subscription_id: str) -> str:
         """Build the Redis key under which a UE's geofencing subscription is stored."""
-        return f"poc_geofencing_{ue_supi}_{subscription_id}"
+        return f"poc:geofencing:{ue_supi}:{subscription_id}"
 
     @staticmethod
     def crash_subscribers_key(camera_supi: str) -> str:
         """Build the Redis key for the set of pedestrians currently inside a camera's area."""
-        return f"poc_camera_crash_subscribers_{camera_supi}"
+        return f"poc:camera_crash_subscribers:{camera_supi}"
 
     @abstractmethod
     async def create_geofencing_subscription(
@@ -60,7 +60,7 @@ class GeofencingInterface(ABC):
 
     async def get_all_geofencing_subscriptions(self, ue: UE) -> list[str]:
         """Return all stored geofencing subscription ids for the given UE."""
-        prefix = f"poc_geofencing_{ue.supi}_"
+        prefix = f"poc:geofencing:{ue.supi}:"
         keys = await self._redis.keys(f"{prefix}*")
         # the subscription id is the key suffix (the stored value differs per backend)
         return [cast(str, key)[len(prefix) :] for key in keys]

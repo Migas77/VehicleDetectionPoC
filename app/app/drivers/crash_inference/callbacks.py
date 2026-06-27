@@ -14,8 +14,8 @@ LOG = logging.getLogger(__name__)
 
 router = APIRouter(prefix="/callbacks/crash_inference")
 
-_DEBOUNCE_KEY_PREFIX = "poc_crash_inference_debounce_"
-_STREAK_KEY_PREFIX = "poc_crash_inference_streak_"
+_DEBOUNCE_KEY_PREFIX = "poc:crash_inference:debounce:"
+_STREAK_KEY_PREFIX = "poc:crash_inference:streak:"
 
 
 @router.post("/{ue_supi}", status_code=204)

@@ -13,7 +13,7 @@ class CrashInferenceInterface(ABC):
 
     @staticmethod
     def _pipeline_key(camera_supi: str) -> str:
-        return f"poc_crash_inference_{camera_supi}"
+        return f"poc:crash_inference:{camera_supi}"
 
     @abstractmethod
     async def start_pipeline(self, camera: CameraUE) -> str | None:

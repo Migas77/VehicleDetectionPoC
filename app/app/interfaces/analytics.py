@@ -16,7 +16,7 @@ class AnalyticsInterface(ABC):
     @staticmethod
     def _subscription_key(ue_supi: str, subscription_id: str) -> str:
         """Build the Redis key under which a UE's analytics subscription id is stored."""
-        return f"poc_analytics_{ue_supi}_{subscription_id}"
+        return f"poc:analytics:{ue_supi}:{subscription_id}"
 
     @abstractmethod
     async def create_analytics_subscription(
@@ -32,7 +32,7 @@ class AnalyticsInterface(ABC):
 
     async def get_all_analytics_subscriptions(self, ue: UeWithQoS) -> list[str]:
         """Return all stored analytics subscription ids for the given UE."""
-        keys = await self._redis.keys(f"poc_analytics_{ue.supi}_*")
+        keys = await self._redis.keys(f"poc:analytics:{ue.supi}:*")
         if not keys:
             return []
         values = await self._redis.mget(keys)
