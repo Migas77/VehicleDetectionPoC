@@ -120,6 +120,21 @@ class CamerasSettings(BaseModel):
         )
 
 
+class CcamBrokerSettings(BaseModel):
+    client_id: str = "vehicle-crash-detection-poc"
+
+    host: str = "es-broker.av.it.pt"
+    port: int = 8090
+
+    username: str | None = None
+    password: str | None = None
+
+    transport: Literal["tcp", "websockets", "unix"] = "websockets"
+    ws_path: str = "/WS"
+
+    topic_base_path: str = "its_center/inqueue/json"
+
+
 class RoboflowSettings(BaseModel):
     api_key: str
 
@@ -187,6 +202,7 @@ class Settings(BaseSettings):
     cameras: CamerasSettings
     crash_inference: CrashInferenceSettings
     redis: RedisSettings = Field(default_factory=RedisSettings)
+    ccam_broker: CcamBrokerSettings = Field(default_factory=CcamBrokerSettings)
 
     @model_validator(mode="after")
     def validate_required_sections(self) -> "Settings":

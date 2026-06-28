@@ -44,3 +44,14 @@ poc_notification_url = "http://192.168.0.180:8080"
 url = "redis://localhost:6379"
 # username = "..."   # optional
 # password = "..."   # optional
+
+[ccam_broker]
+client_id = "vehicle-detection-poc"
+host = "es-broker.av.it.pt"
+port = 8090
+transport = "websockets"
+ws_path = "/WS"
+# username = "..."           # optional
+# password = "..."           # optional
+topic_base_path = "its_center/inqueue/json"
+
