@@ -1,28 +1,37 @@
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import Annotated
 
-import paho.mqtt.client as mqtt
+import aiomqtt
 from fastapi import Depends
-from paho.mqtt.enums import CallbackAPIVersion
 
 from app.settings import settings
 
-
-_broker = settings.ccam_broker
-
-_mqtt_client: mqtt.Client = mqtt.Client(
-    CallbackAPIVersion.VERSION2,
-    client_id=_broker.client_id,
-    transport=_broker.transport,
-)
-
-if _broker.transport == "websockets":
-    _mqtt_client.ws_set_options(path=_broker.ws_path)
-
-_mqtt_client.username_pw_set(_broker.username, _broker.password)
+_client: aiomqtt.Client | None = None
 
 
-def get_mqtt_client() -> mqtt.Client:
-    return _mqtt_client
+@asynccontextmanager
+async def mqtt_lifespan() -> AsyncGenerator[None, None]:
+    global _client
+    broker = settings.ccam_broker
+    async with aiomqtt.Client(
+        hostname=broker.host,
+        port=broker.port,
+        identifier=broker.client_id,
+        username=broker.username,
+        password=broker.password,
+        transport=broker.transport,
+        websocket_path=broker.ws_path if broker.transport == "websockets" else None,
+    ) as client:
+        _client = client
+        yield
+    _client = None
 
 
-MqttClientDep = Annotated[mqtt.Client, Depends(get_mqtt_client)]
+def get_mqtt_client() -> aiomqtt.Client:
+    if _client is None:
+        raise RuntimeError("MQTT client not connected — ensure mqtt_lifespan is active")
+    return _client
+
+
+MqttClientDep = Annotated[aiomqtt.Client, Depends(get_mqtt_client)]

@@ -1,9 +1,10 @@
+import itertools
 import logging
+from collections.abc import AsyncGenerator
+from contextlib import asynccontextmanager
 from typing import cast, Iterable
 
 from fastapi import FastAPI
-
-import itertools
 
 from app.drivers import router as drivers_router
 from app.drivers.analytics import AnalyticsInterfaceDep
@@ -21,6 +22,7 @@ from app.interfaces import (
     QoDProvisioningInterface,
     QoSProfilesInterface,
 )
+from app.mqtt import mqtt_lifespan
 from app.routers import router as routers_router
 from app.interfaces.ues import PocUEsByType, UEsInterface
 from app.schemas.camara.common import Point
@@ -213,7 +215,13 @@ async def _stop_moving_ues(
         await ues_interface.stop_movement(ue.supi)
 
 
-app = FastAPI(title=settings.poc_title)
+@asynccontextmanager
+async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    async with mqtt_lifespan():
+        yield
+
+
+app = FastAPI(title=settings.poc_title, lifespan=lifespan)
 app.include_router(drivers_router)
 app.include_router(routers_router)
 
