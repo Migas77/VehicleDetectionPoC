@@ -14,7 +14,7 @@ from app.schemas.poc import UE
 from app.schemas.poc.ue_location import UELocation
 
 LOG = logging.getLogger(__name__)
-router = APIRouter(prefix="/ws")
+router = APIRouter()
 
 _ue_location_list_adapter: TypeAdapter[list[UELocation]] = TypeAdapter(list[UELocation])
 

@@ -1,0 +1,27 @@
+from datetime import datetime, timezone
+from enum import Enum
+from typing import Annotated
+from uuid import UUID
+
+from pydantic import BaseModel, Field
+
+
+class CrashNotificationStatus(str, Enum):
+    detected = "DETECTED"
+    notified = "NOTIFIED"
+
+
+class CrashNotificationChannel(str, Enum):
+    sms = "SMS"
+    denm = "DENM"
+
+
+class CrashStatusEvent(BaseModel):
+    incident_id: UUID
+    camera_supi: str
+    status: CrashNotificationStatus
+    channel: CrashNotificationChannel | None = None  # None for DETECTED
+    recipient: Annotated[str | None, Field(pattern=r"^[0-9]{15,16}$")] = (
+        None  # pedestrian supi for SMS; None otherwise
+    )
+    timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

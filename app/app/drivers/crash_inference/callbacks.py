@@ -2,11 +2,14 @@ import asyncio
 import logging
 from datetime import timedelta
 from typing import Any
+from uuid import UUID, uuid4
 
 import redis.asyncio as aioredis
 from fastapi import APIRouter
 from fastapi.responses import Response
 
+from app.drivers.crash_status import CrashStatusBrokerDep
+from app.interfaces.crash_status import CrashStatusBrokerInterface
 from app.drivers.ccam import CcamInterfaceDep
 from app.drivers.geofencing.deps import GeofencingInterfaceDep
 from app.drivers.location import LocationInterfaceDep
@@ -20,6 +23,11 @@ from app.interfaces.ues import UEsInterface
 from app.redis import RedisDep
 from app.schemas.camara.location import Circle
 from app.schemas.ccam import ReferencePositionWithConfidence
+from app.schemas.poc.crash_status import (
+    CrashNotificationChannel,
+    CrashNotificationStatus,
+    CrashStatusEvent,
+)
 from app.settings import settings
 
 LOG = logging.getLogger(__name__)
@@ -43,10 +51,13 @@ async def crash_inference_webhook(
     ccam: CcamInterfaceDep,
     geofencing: GeofencingInterfaceDep,
     location: LocationInterfaceDep,
+    broker: CrashStatusBrokerDep,
 ) -> Response:
     """Receive Roboflow inference webhook. Returns 204 immediately; processing runs in background."""
     asyncio.create_task(
-        _process_detection(ue_supi, body, redis, ues, sms, ccam, geofencing, location)
+        _process_detection(
+            ue_supi, body, redis, ues, sms, ccam, geofencing, location, broker
+        )
     )
     return Response(status_code=204)
 
@@ -60,6 +71,7 @@ async def _process_detection(
     ccam: CcamInterface,
     geofencing: GeofencingInterface,
     location: LocationInterface,
+    broker: CrashStatusBrokerInterface,
 ) -> None:
 
     detections_number: int = payload.get("detections_number", 0)
@@ -135,11 +147,25 @@ async def _process_detection(
         [p["class"] for p in matching],
     )
 
+    # TODO: change to the UUID sent by roboflow (i think)
+    incident_id = uuid4()
+    broker.publish(
+        CrashStatusEvent(
+            incident_id=incident_id,
+            camera_supi=ue_supi,
+            status=CrashNotificationStatus.detected,
+        )
+    )
+
     # Crash detection handling - Send SMS to nearby pedestrian UEs
-    await _send_crash_sms_to_nearby_pedestrians(ue_supi, geofencing, ues, sms)
+    await _send_crash_sms_to_nearby_pedestrians(
+        ue_supi, geofencing, ues, sms, incident_id, broker
+    )
 
     # Crash detection handling - Send DENM message to nearby vehicle UEs
-    await _send_crash_denm_to_nearby_vehicles(ue_supi, ues, location, ccam)
+    await _send_crash_denm_to_nearby_vehicles(
+        ue_supi, ues, location, ccam, incident_id, broker
+    )
 
 
 async def _send_crash_sms_to_nearby_pedestrians(
@@ -147,6 +173,8 @@ async def _send_crash_sms_to_nearby_pedestrians(
     geofencing: GeofencingInterface,
     ues: UEsInterface,
     sms: SMSInterface,
+    incident_id: UUID,
+    broker: CrashStatusBrokerInterface,
 ) -> None:
     nearby_supis = await geofencing.get_camera_area_subscribers(camera_supi)
     if not nearby_supis:
@@ -157,12 +185,20 @@ async def _send_crash_sms_to_nearby_pedestrians(
         return
 
     await asyncio.gather(
-        *[_fetch_ue_and_send_sms(supi, ues, sms) for supi in nearby_supis]
+        *[
+            _fetch_ue_and_send_sms(supi, ues, sms, camera_supi, incident_id, broker)
+            for supi in nearby_supis
+        ]
     )
 
 
 async def _fetch_ue_and_send_sms(
-    supi: str, ues: UEsInterface, sms: SMSInterface
+    supi: str,
+    ues: UEsInterface,
+    sms: SMSInterface,
+    camera_supi: str,
+    incident_id: UUID,
+    broker: CrashStatusBrokerInterface,
 ) -> None:
     try:
         ue = await ues.get_ue_by_supi(supi)
@@ -172,6 +208,15 @@ async def _fetch_ue_and_send_sms(
 
     try:
         await sms.send_sms(ue, _CRASH_ALERT_SMS)
+        broker.publish(
+            CrashStatusEvent(
+                incident_id=incident_id,
+                camera_supi=camera_supi,
+                status=CrashNotificationStatus.notified,
+                channel=CrashNotificationChannel.sms,
+                recipient=supi,
+            )
+        )
     except Exception:
         LOG.exception("Failed to send SMS to UE supi=%s", supi)
 
@@ -181,6 +226,8 @@ async def _send_crash_denm_to_nearby_vehicles(
     ues: UEsInterface,
     location: LocationInterface,
     ccam: CcamInterface,
+    incident_id: UUID,
+    broker: CrashStatusBrokerInterface,
 ) -> None:
     try:
         camera_ue = await ues.get_ue_by_supi(camera_supi)
@@ -195,5 +242,13 @@ async def _send_crash_denm_to_nearby_vehicles(
             longitude=int(area.center.longitude * 10_000_000),
         )
         await ccam.send_denm(denm_location, _CRASH_ALERT_DENM)
+        broker.publish(
+            CrashStatusEvent(
+                incident_id=incident_id,
+                camera_supi=camera_supi,
+                status=CrashNotificationStatus.notified,
+                channel=CrashNotificationChannel.denm,
+            )
+        )
     except Exception:
         LOG.exception("Failed to send DENM for camera supi=%s", camera_supi)

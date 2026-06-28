@@ -48,4 +48,4 @@ class MqttCcamBackend(CcamInterface):
             location.latitude,
             location.longitude,
         )
-        await self._client.publish(topic, payload)
+        await self._client.publish(topic, payload, qos=1)
