@@ -121,6 +121,8 @@ class CamerasSettings(BaseModel):
 
 
 class CcamBrokerSettings(BaseModel):
+    backend: Literal["mqtt", "mock"] = "mock"
+
     client_id: str = "vehicle-crash-detection-poc"
 
     host: str = "es-broker.av.it.pt"

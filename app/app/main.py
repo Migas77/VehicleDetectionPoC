@@ -217,7 +217,10 @@ async def _stop_moving_ues(
 
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
-    async with mqtt_lifespan():
+    if settings.ccam_broker.backend == "mqtt":
+        async with mqtt_lifespan():
+            yield
+    else:
         yield
 
 

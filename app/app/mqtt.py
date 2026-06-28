@@ -32,6 +32,3 @@ def get_mqtt_client() -> aiomqtt.Client:
     if _client is None:
         raise RuntimeError("MQTT client not connected — ensure mqtt_lifespan is active")
     return _client
-
-
-MqttClientDep = Annotated[aiomqtt.Client, Depends(get_mqtt_client)]

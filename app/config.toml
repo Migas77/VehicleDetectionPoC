@@ -46,6 +46,7 @@ url = "redis://localhost:6379"
 # password = "..."   # optional
 
 [ccam_broker]
+backend = "mqtt"
 client_id = "vehicle-detection-poc"
 host = "es-broker.av.it.pt"
 port = 8090
