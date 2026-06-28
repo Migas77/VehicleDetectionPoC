@@ -17,5 +17,13 @@ class CrashStatusBrokerInterface(ABC):
         """Remove a subscriber queue (called on WebSocket disconnect)."""
 
     @abstractmethod
-    def publish(self, event: CrashStatusEvent) -> None:
-        """Fan out a status event to all currently connected WebSocket clients."""
+    async def publish(self, event: CrashStatusEvent) -> None:
+        """Persist the event to Redis and fan out to all currently connected WebSocket clients."""
+
+    @abstractmethod
+    async def list_incidents(self, offset: int, limit: int) -> list[CrashStatusEvent]:
+        """Return the DETECTED event for each incident, most-recent first."""
+
+    @abstractmethod
+    async def get_incident(self, incident_id: str) -> list[CrashStatusEvent]:
+        """Return all events recorded for a given incident, in chronological order."""

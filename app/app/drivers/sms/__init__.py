@@ -2,21 +2,10 @@ from typing import Annotated
 
 from fastapi import Depends
 
+from app.drivers.sms.nef import nef_sms_interface
 from app.interfaces.sms import SMSInterface
-from app.settings import settings
 
-sms_interface: SMSInterface
-
-match settings.net_apis.api:
-    case "nef":
-        from .nef import nef_sms_interface
-
-        sms_interface = nef_sms_interface
-    case "camara":
-        raise RuntimeError(
-            "SMS sending is not supported in CAMARA mode: "
-            "the CAMARA gateway does not expose a generic SMS API"
-        )
+sms_interface: SMSInterface = nef_sms_interface
 
 
 async def get_sms_interface() -> SMSInterface:

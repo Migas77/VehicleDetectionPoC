@@ -1,13 +1,24 @@
 import logging
 from ipaddress import IPv4Address
+from typing import Any
+
+from pydantic import TypeAdapter
 
 from app.interfaces.location import LocationInterface
 from app.schemas.camara.device import Device, DeviceIpv4Addr
-from app.schemas.camara.location import Location, RetrievalLocationRequest
+from app.schemas.camara.location import (
+    Area,
+    Circle,
+    Location,
+    Polygon,
+    RetrievalLocationRequest,
+)
 from app.schemas.poc.ue import UE
 from app.settings import settings
 
 LOG = logging.getLogger(__name__)
+
+_dict_adapter: TypeAdapter[dict[str, Any]] = TypeAdapter(dict[str, Any])
 
 
 class CamaraLocationBackend(LocationInterface):
@@ -34,6 +45,19 @@ class CamaraLocationBackend(LocationInterface):
             "neither ip_address_v4 nor msisdn is set"
         )
 
+    @staticmethod
+    def _parse_area(area_data: dict[str, Any], ue_supi: str) -> Area:
+        match area_data.get("areaType"):
+            case "CIRCLE":
+                return Circle.model_validate(area_data)
+            case "POLYGON":
+                return Polygon.model_validate(area_data)
+            case _:
+                raise RuntimeError(
+                    f"Unsupported CAMARA location area type '{area_data.get('areaType')}' "
+                    f"for UE supi={ue_supi}"
+                )
+
     async def retrieve_location(self, ue: UE) -> Location:
         payload = RetrievalLocationRequest(device=self._build_device(ue))
         LOG.info("Retrieving CAMARA location for UE supi=%s", ue.supi)
@@ -46,7 +70,9 @@ class CamaraLocationBackend(LocationInterface):
             raise RuntimeError(
                 f"CAMARA location retrieval failed ({res.status_code}): {res.text}"
             )
-        location = Location.model_validate_json(res.content)
+        data = _dict_adapter.validate_json(res.content)
+        area = self._parse_area(data.get("area", {}), ue.supi)
+        location = Location(lastLocationTime=data["lastLocationTime"], area=area)
         LOG.info(
             "CAMARA location retrieved for UE supi=%s: areaType=%s",
             ue.supi,

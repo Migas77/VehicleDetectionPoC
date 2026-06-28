@@ -15,7 +15,7 @@ class UE(BaseModel):
 
     model_config = ConfigDict(from_attributes=True)
 
-    id: int
+    id: int = -1  # Because NEF Emulator doesn't return id in GET /api/v1/UEs/{supi}
     supi: Annotated[str, Field(pattern=r"^[0-9]{15,16}$")]
     name: str | None = None
     description: str | None = None

@@ -185,9 +185,8 @@ async def _process_detection(
     except Exception:
         LOG.exception("Failed to fetch camera location for supi=%s", ue_supi)
 
-    # TODO: change to the UUID sent by roboflow (i think)
     incident_id = uuid4()
-    broker.publish(
+    await broker.publish(
         CrashStatusEvent(
             incident_id=incident_id,
             camera_supi=ue_supi,
@@ -251,7 +250,7 @@ async def _fetch_ue_and_send_sms(
 
     try:
         await sms.send_sms(ue, _CRASH_ALERT_SMS)
-        broker.publish(
+        await broker.publish(
             CrashStatusEvent(
                 incident_id=incident_id,
                 camera_supi=camera_supi,
@@ -283,7 +282,7 @@ async def _send_crash_denm_to_nearby_vehicles(
             longitude=int(crash_location.longitude * 10_000_000),
         )
         await ccam.send_denm(denm_location, _CRASH_ALERT_DENM)
-        broker.publish(
+        await broker.publish(
             CrashStatusEvent(
                 incident_id=incident_id,
                 camera_supi=camera_supi,
