@@ -129,7 +129,7 @@ class CcamBrokerSettings(BaseModel):
     username: str | None = None
     password: str | None = None
 
-    transport: Literal["tcp", "websockets", "unix"] = "websockets"
+    transport: Literal["tcp", "websockets", "unix"] = "tcp"
     ws_path: str = "/WS"
 
     topic_base_path: str = "its_center/inqueue/json"
