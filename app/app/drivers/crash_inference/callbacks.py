@@ -7,7 +7,19 @@ import redis.asyncio as aioredis
 from fastapi import APIRouter
 from fastapi.responses import Response
 
+from app.drivers.ccam import CcamInterfaceDep
+from app.drivers.geofencing.deps import GeofencingInterfaceDep
+from app.drivers.location import LocationInterfaceDep
+from app.drivers.sms import SMSInterfaceDep
+from app.drivers.ues import UEsInterfaceDep
+from app.interfaces.ccam import CcamInterface
+from app.interfaces.geofencing import GeofencingInterface
+from app.interfaces.location import LocationInterface
+from app.interfaces.sms import SMSInterface
+from app.interfaces.ues import UEsInterface
 from app.redis import RedisDep
+from app.schemas.camara.location import Circle
+from app.schemas.ccam import ReferencePositionWithConfidence
 from app.settings import settings
 
 LOG = logging.getLogger(__name__)
@@ -17,18 +29,37 @@ router = APIRouter(prefix="/callbacks/crash_inference")
 _DEBOUNCE_KEY_PREFIX = "poc:crash_inference:debounce:"
 _STREAK_KEY_PREFIX = "poc:crash_inference:streak:"
 
+_CRASH_ALERT_SMS = "ALERT: Vehicle crash detected nearby. Please be cautious."
+_CRASH_ALERT_DENM = "Vehicle crash detected ahead. Proceed with caution."
+
 
 @router.post("/{ue_supi}", status_code=204)
 async def crash_inference_webhook(
-    ue_supi: str, body: dict[str, Any], redis: RedisDep
+    ue_supi: str,
+    body: dict[str, Any],
+    redis: RedisDep,
+    ues: UEsInterfaceDep,
+    sms: SMSInterfaceDep,
+    ccam: CcamInterfaceDep,
+    geofencing: GeofencingInterfaceDep,
+    location: LocationInterfaceDep,
 ) -> Response:
     """Receive Roboflow inference webhook. Returns 204 immediately; processing runs in background."""
-    asyncio.create_task(_process_detection(ue_supi, body, redis))
+    asyncio.create_task(
+        _process_detection(ue_supi, body, redis, ues, sms, ccam, geofencing, location)
+    )
     return Response(status_code=204)
 
 
 async def _process_detection(
-    ue_supi: str, payload: dict[str, Any], redis: aioredis.Redis
+    ue_supi: str,
+    payload: dict[str, Any],
+    redis: aioredis.Redis,
+    ues: UEsInterface,
+    sms: SMSInterface,
+    ccam: CcamInterface,
+    geofencing: GeofencingInterface,
+    location: LocationInterface,
 ) -> None:
 
     detections_number: int = payload.get("detections_number", 0)
@@ -103,4 +134,66 @@ async def _process_detection(
         ue_supi,
         [p["class"] for p in matching],
     )
-    # TODO: implement crash detection handling (i.e. send sms to pedestrians and message to UEs)
+
+    # Crash detection handling - Send SMS to nearby pedestrian UEs
+    await _send_crash_sms_to_nearby_pedestrians(ue_supi, geofencing, ues, sms)
+
+    # Crash detection handling - Send DENM message to nearby vehicle UEs
+    await _send_crash_denm_to_nearby_vehicles(ue_supi, ues, location, ccam)
+
+
+async def _send_crash_sms_to_nearby_pedestrians(
+    camera_supi: str,
+    geofencing: GeofencingInterface,
+    ues: UEsInterface,
+    sms: SMSInterface,
+) -> None:
+    nearby_supis = await geofencing.get_camera_area_subscribers(camera_supi)
+    if not nearby_supis:
+        LOG.info(
+            "No nearby UEs in camera supi=%s area, skipping SMS notifications",
+            camera_supi,
+        )
+        return
+
+    await asyncio.gather(
+        *[_fetch_ue_and_send_sms(supi, ues, sms) for supi in nearby_supis]
+    )
+
+
+async def _fetch_ue_and_send_sms(
+    supi: str, ues: UEsInterface, sms: SMSInterface
+) -> None:
+    try:
+        ue = await ues.get_ue_by_supi(supi)
+    except Exception:
+        LOG.exception("Failed to fetch UE supi=%s for SMS notification", supi)
+        return
+
+    try:
+        await sms.send_sms(ue, _CRASH_ALERT_SMS)
+    except Exception:
+        LOG.exception("Failed to send SMS to UE supi=%s", supi)
+
+
+async def _send_crash_denm_to_nearby_vehicles(
+    camera_supi: str,
+    ues: UEsInterface,
+    location: LocationInterface,
+    ccam: CcamInterface,
+) -> None:
+    try:
+        camera_ue = await ues.get_ue_by_supi(camera_supi)
+        camera_location = await location.retrieve_location(camera_ue)
+        area = camera_location.area
+        if not isinstance(area, Circle):
+            raise RuntimeError(
+                f"Unsupported location area type {type(area).__name__} for camera supi={camera_supi}"
+            )
+        denm_location = ReferencePositionWithConfidence(
+            latitude=int(area.center.latitude * 10_000_000),
+            longitude=int(area.center.longitude * 10_000_000),
+        )
+        await ccam.send_denm(denm_location, _CRASH_ALERT_DENM)
+    except Exception:
+        LOG.exception("Failed to send DENM for camera supi=%s", camera_supi)

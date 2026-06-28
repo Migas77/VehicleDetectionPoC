@@ -1,9 +1,7 @@
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
-from typing import Annotated
 
 import aiomqtt
-from fastapi import Depends
 
 from app.settings import settings
 
