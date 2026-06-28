@@ -16,6 +16,14 @@ class CrashNotificationChannel(str, Enum):
     denm = "DENM"
 
 
+class CrashLocation(BaseModel):
+    latitude: float
+    longitude: float
+    road_name: str | None = (
+        None  # reverse-geocoded; None if lookup failed or road unknown
+    )
+
+
 class CrashStatusEvent(BaseModel):
     incident_id: UUID
     camera_supi: str
@@ -24,4 +32,5 @@ class CrashStatusEvent(BaseModel):
     recipient: Annotated[str | None, Field(pattern=r"^[0-9]{15,16}$")] = (
         None  # pedestrian supi for SMS; None otherwise
     )
+    location: CrashLocation | None = None
     timestamp: datetime = Field(default_factory=lambda: datetime.now(timezone.utc))

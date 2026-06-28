@@ -1,4 +1,5 @@
 import asyncio
+import functools
 import logging
 from datetime import timedelta
 from typing import Any
@@ -7,6 +8,8 @@ from uuid import UUID, uuid4
 import redis.asyncio as aioredis
 from fastapi import APIRouter
 from fastapi.responses import Response
+
+from geopy.geocoders import Nominatim
 
 from app.drivers.crash_status import CrashStatusBrokerDep
 from app.interfaces.crash_status import CrashStatusBrokerInterface
@@ -24,6 +27,7 @@ from app.redis import RedisDep
 from app.schemas.camara.location import Circle
 from app.schemas.ccam import ReferencePositionWithConfidence
 from app.schemas.poc.crash_status import (
+    CrashLocation,
     CrashNotificationChannel,
     CrashNotificationStatus,
     CrashStatusEvent,
@@ -39,6 +43,22 @@ _STREAK_KEY_PREFIX = "poc:crash_inference:streak:"
 
 _CRASH_ALERT_SMS = "ALERT: Vehicle crash detected nearby. Please be cautious."
 _CRASH_ALERT_DENM = "Vehicle crash detected ahead. Proceed with caution."
+
+
+@functools.lru_cache(maxsize=512)
+def _fetch_road_name(lat: float, lon: float) -> str | None:
+    geolocator = Nominatim(user_agent="vehicle-detection-poc")
+    result = geolocator.reverse((lat, lon), language="en")
+    return (result.raw.get("address") or {}).get("road") if result else None
+
+
+async def _get_road_name(lat: float, lon: float) -> str | None:
+    key = (round(lat, 4), round(lon, 4))
+    try:
+        return await asyncio.to_thread(_fetch_road_name, *key)
+    except Exception:
+        LOG.exception("Reverse geocoding failed for (%s, %s)", lat, lon)
+        return None
 
 
 @router.post("/{ue_supi}", status_code=204)
@@ -147,6 +167,24 @@ async def _process_detection(
         [p["class"] for p in matching],
     )
 
+    crash_location: CrashLocation | None = None
+    try:
+        camera_ue = await ues.get_ue_by_supi(ue_supi)
+        camera_loc = await location.retrieve_location(camera_ue)
+        area = camera_loc.area
+        if not isinstance(area, Circle):
+            raise RuntimeError(
+                f"Unsupported location area type {type(area).__name__} for camera supi={ue_supi}"
+            )
+        road_name = await _get_road_name(area.center.latitude, area.center.longitude)
+        crash_location = CrashLocation(
+            latitude=area.center.latitude,
+            longitude=area.center.longitude,
+            road_name=road_name,
+        )
+    except Exception:
+        LOG.exception("Failed to fetch camera location for supi=%s", ue_supi)
+
     # TODO: change to the UUID sent by roboflow (i think)
     incident_id = uuid4()
     broker.publish(
@@ -154,17 +192,18 @@ async def _process_detection(
             incident_id=incident_id,
             camera_supi=ue_supi,
             status=CrashNotificationStatus.detected,
+            location=crash_location,
         )
     )
 
     # Crash detection handling - Send SMS to nearby pedestrian UEs
     await _send_crash_sms_to_nearby_pedestrians(
-        ue_supi, geofencing, ues, sms, incident_id, broker
+        ue_supi, geofencing, ues, sms, incident_id, broker, crash_location
     )
 
     # Crash detection handling - Send DENM message to nearby vehicle UEs
     await _send_crash_denm_to_nearby_vehicles(
-        ue_supi, ues, location, ccam, incident_id, broker
+        ue_supi, ccam, crash_location, incident_id, broker
     )
 
 
@@ -175,6 +214,7 @@ async def _send_crash_sms_to_nearby_pedestrians(
     sms: SMSInterface,
     incident_id: UUID,
     broker: CrashStatusBrokerInterface,
+    crash_location: CrashLocation | None,
 ) -> None:
     nearby_supis = await geofencing.get_camera_area_subscribers(camera_supi)
     if not nearby_supis:
@@ -186,7 +226,9 @@ async def _send_crash_sms_to_nearby_pedestrians(
 
     await asyncio.gather(
         *[
-            _fetch_ue_and_send_sms(supi, ues, sms, camera_supi, incident_id, broker)
+            _fetch_ue_and_send_sms(
+                supi, ues, sms, camera_supi, incident_id, broker, crash_location
+            )
             for supi in nearby_supis
         ]
     )
@@ -199,6 +241,7 @@ async def _fetch_ue_and_send_sms(
     camera_supi: str,
     incident_id: UUID,
     broker: CrashStatusBrokerInterface,
+    crash_location: CrashLocation | None,
 ) -> None:
     try:
         ue = await ues.get_ue_by_supi(supi)
@@ -215,6 +258,7 @@ async def _fetch_ue_and_send_sms(
                 status=CrashNotificationStatus.notified,
                 channel=CrashNotificationChannel.sms,
                 recipient=supi,
+                location=crash_location,
             )
         )
     except Exception:
@@ -223,23 +267,20 @@ async def _fetch_ue_and_send_sms(
 
 async def _send_crash_denm_to_nearby_vehicles(
     camera_supi: str,
-    ues: UEsInterface,
-    location: LocationInterface,
     ccam: CcamInterface,
+    crash_location: CrashLocation | None,
     incident_id: UUID,
     broker: CrashStatusBrokerInterface,
 ) -> None:
+    if crash_location is None:
+        LOG.warning(
+            "Skipping DENM for camera supi=%s: location unavailable", camera_supi
+        )
+        return
     try:
-        camera_ue = await ues.get_ue_by_supi(camera_supi)
-        camera_location = await location.retrieve_location(camera_ue)
-        area = camera_location.area
-        if not isinstance(area, Circle):
-            raise RuntimeError(
-                f"Unsupported location area type {type(area).__name__} for camera supi={camera_supi}"
-            )
         denm_location = ReferencePositionWithConfidence(
-            latitude=int(area.center.latitude * 10_000_000),
-            longitude=int(area.center.longitude * 10_000_000),
+            latitude=int(crash_location.latitude * 10_000_000),
+            longitude=int(crash_location.longitude * 10_000_000),
         )
         await ccam.send_denm(denm_location, _CRASH_ALERT_DENM)
         broker.publish(
@@ -248,6 +289,7 @@ async def _send_crash_denm_to_nearby_vehicles(
                 camera_supi=camera_supi,
                 status=CrashNotificationStatus.notified,
                 channel=CrashNotificationChannel.denm,
+                location=crash_location,
             )
         )
     except Exception:

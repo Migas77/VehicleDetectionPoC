@@ -27,7 +27,7 @@ strict = true
 plugins = ['pydantic.mypy']
 
 [[tool.mypy.overrides]]
-module = ["geopy", "geopy.distance", "shapely"]
+module = ["geopy", "geopy.distance", "geopy.geocoders", "shapely"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]

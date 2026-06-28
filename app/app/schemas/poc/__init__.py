@@ -2,6 +2,7 @@ from app.schemas.poc.area import SurveyedArea
 from app.schemas.poc.cameras import CameraUE, DynamicCameraUE, StaticCameraUE
 from app.schemas.poc.car import CarUE
 from app.schemas.poc.crash_status import (
+    CrashLocation,
     CrashNotificationChannel,
     CrashNotificationStatus,
     CrashStatusEvent,
@@ -24,6 +25,7 @@ __all__ = [
     "SurveyedArea",
     "GeofenceState",
     "ManagedGeofencingSubscription",
+    "CrashLocation",
     "CrashNotificationStatus",
     "CrashNotificationChannel",
     "CrashStatusEvent",
