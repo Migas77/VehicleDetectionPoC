@@ -135,6 +135,8 @@ class CcamBrokerSettings(BaseModel):
     ws_path: str = "/WS"
 
     topic_base_path: str = "its_center/inqueue/json"
+    station_id: int = 141414
+    validity_duration: int = 120  # seconds
 
 
 class RoboflowSettings(BaseModel):

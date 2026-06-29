@@ -25,7 +25,6 @@ from app.interfaces.sms import SMSInterface
 from app.interfaces.ues import UEsInterface
 from app.redis import RedisDep
 from app.schemas.camara.location import Circle
-from app.schemas.ccam import ReferencePositionWithConfidence
 from app.schemas.poc.crash_status import (
     CrashLocation,
     CrashNotificationChannel,
@@ -42,7 +41,6 @@ _DEBOUNCE_KEY_PREFIX = "poc:crash_inference:debounce:"
 _STREAK_KEY_PREFIX = "poc:crash_inference:streak:"
 
 _CRASH_ALERT_SMS = "ALERT: Vehicle crash detected nearby. Please be cautious."
-_CRASH_ALERT_DENM = "Vehicle crash detected ahead. Proceed with caution."
 
 
 @functools.lru_cache(maxsize=512)
@@ -277,11 +275,7 @@ async def _send_crash_denm_to_nearby_vehicles(
         )
         return
     try:
-        denm_location = ReferencePositionWithConfidence(
-            latitude=int(crash_location.latitude * 10_000_000),
-            longitude=int(crash_location.longitude * 10_000_000),
-        )
-        await ccam.send_denm(denm_location, _CRASH_ALERT_DENM)
+        await ccam.send_denm(crash_location)
         await broker.publish(
             CrashStatusEvent(
                 incident_id=incident_id,

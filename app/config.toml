@@ -55,4 +55,6 @@ ws_path = "/WS"
 # username = "..."           # optional
 # password = "..."           # optional
 topic_base_path = "its_center/inqueue/json"
+station_id = 141414
+validity_duration = 120  # seconds
 
