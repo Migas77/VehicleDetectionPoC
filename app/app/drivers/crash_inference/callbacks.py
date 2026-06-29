@@ -40,24 +40,6 @@ router = APIRouter(prefix="/callbacks/crash_inference")
 _DEBOUNCE_KEY_PREFIX = "poc:crash_inference:debounce:"
 _STREAK_KEY_PREFIX = "poc:crash_inference:streak:"
 
-_CRASH_ALERT_SMS = "ALERT: Vehicle crash detected nearby. Please be cautious."
-
-
-@functools.lru_cache(maxsize=512)
-def _fetch_road_name(lat: float, lon: float) -> str | None:
-    geolocator = Nominatim(user_agent="vehicle-detection-poc")
-    result = geolocator.reverse((lat, lon), language="en")
-    return (result.raw.get("address") or {}).get("road") if result else None
-
-
-async def _get_road_name(lat: float, lon: float) -> str | None:
-    key = (round(lat, 4), round(lon, 4))
-    try:
-        return await asyncio.to_thread(_fetch_road_name, *key)
-    except Exception:
-        LOG.exception("Reverse geocoding failed for (%s, %s)", lat, lon)
-        return None
-
 
 @router.post("/{ue_supi}", status_code=204)
 async def crash_inference_webhook(
@@ -78,6 +60,31 @@ async def crash_inference_webhook(
         )
     )
     return Response(status_code=204)
+
+
+def _build_crash_sms(location: CrashLocation | None) -> str:
+    if location is None:
+        return "ALERT: Vehicle crash detected nearby. Please be cautious."
+    coords = f"({location.latitude:.6f}, {location.longitude:.6f})"
+    if location.road_name:
+        return f"ALERT: Vehicle crash detected on {location.road_name} {coords}. Please be cautious."
+    return f"ALERT: Vehicle crash detected at {coords}. Please be cautious."
+
+
+@functools.lru_cache(maxsize=512)
+def _fetch_road_name(lat: float, lon: float) -> str | None:
+    geolocator = Nominatim(user_agent="vehicle-detection-poc")
+    result = geolocator.reverse((lat, lon), language="en")
+    return (result.raw.get("address") or {}).get("road") if result else None
+
+
+async def _get_road_name(lat: float, lon: float) -> str | None:
+    key = (round(lat, 4), round(lon, 4))
+    try:
+        return await asyncio.to_thread(_fetch_road_name, *key)
+    except Exception:
+        LOG.exception("Reverse geocoding failed for (%s, %s)", lat, lon)
+        return None
 
 
 async def _process_detection(
@@ -247,7 +254,7 @@ async def _fetch_ue_and_send_sms(
         return
 
     try:
-        await sms.send_sms(ue, _CRASH_ALERT_SMS)
+        await sms.send_sms(ue, _build_crash_sms(crash_location))
         await broker.publish(
             CrashStatusEvent(
                 incident_id=incident_id,
