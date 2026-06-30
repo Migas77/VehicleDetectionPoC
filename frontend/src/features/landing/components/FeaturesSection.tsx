@@ -2,7 +2,7 @@ const FEATURE_CARDS = [
     {
         tag: '5G',
         title: '5G Core via NEF',
-        body: 'Network Exposure Function gives VIGIA secure, policy-controlled access to device location and QoS — alerts ride the operator network, not the public internet.',
+        body: 'Network Exposure Function gives VIGIA secure, policy-controlled access to device location and QoS; alerts ride the operator network, not the public internet.',
     },
     {
         tag: 'API',
@@ -12,7 +12,7 @@ const FEATURE_CARDS = [
     {
         tag: 'CAP',
         title: 'Secured by CAPIF',
-        body: 'The Common API Framework authenticates and authorises every service call between VIGIA, the cameras and the 5G core — zero implicit trust.',
+        body: 'The Common API Framework authenticates and authorises every service call between VIGIA, the cameras and the 5G core; zero implicit trust.',
     },
     {
         tag: 'MSG',

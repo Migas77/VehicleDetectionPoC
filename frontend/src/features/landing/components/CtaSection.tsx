@@ -6,7 +6,7 @@ export function CtaSection() {
                     See VIGIA respond in real time
                 </h2>
                 <p className="text-center text-[17px] text-[#2C2E29] mt-4 mb-0 mx-auto max-w-[520px] leading-[1.55]">
-                    Open the live operations dashboard — watch the map, the detection feed, and the
+                    Open the live operations dashboard: watch the map, the detection feed, and the
                     alert stream react to a simulated collision.
                 </p>
                 <button

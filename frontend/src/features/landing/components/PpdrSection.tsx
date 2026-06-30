@@ -53,7 +53,7 @@ export function PpdrSection() {
                         Public Protection &amp; Disaster Relief, automated at the edge
                     </h2>
                     <p className="text-[#A6A8A1] text-[15.5px] leading-[1.65] mt-[18px] mb-0">
-                        When VIGIA confirms a collision, it doesn't just warn road users — it
+                        When VIGIA confirms a collision, it doesn't just warn road users; it
                         requests prioritised connectivity for first responders, pushes the incident
                         location and a live camera link to the control room, and keeps the alert
                         channel open until the scene is cleared.

@@ -95,7 +95,7 @@ export function CameraFeedMock() {
                 </div>
                 <div className="flex-1 min-w-0">
                     <div className="text-[#F4F3EE] font-semibold text-[14px]">
-                        Collision detected — Av. Dr. Lourenço Peixinho
+                        Collision detected - Av. Dr. Lourenço Peixinho
                     </div>
                     <div className="text-[#9A9C95] text-[12.5px] mt-0.5">
                         Broadcast to 7 pedestrians · 4 vehicles within 250 m

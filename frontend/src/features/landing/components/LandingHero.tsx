@@ -77,7 +77,7 @@ export function LandingHero() {
                     </div>
                 </div>
 
-                {/* Right column — camera mock */}
+                {/* Right column - camera mock */}
                 <CameraFeedMock />
             </div>
         </section>
