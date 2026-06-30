@@ -1,9 +1,14 @@
 export { NotificationRow } from './components/NotificationRow';
 export { NotificationsControls } from './components/NotificationsControls';
-export { INCIDENT_ZONE_TOTALS, MOCK_NOTIFICATIONS } from './data/mock-notifications';
 export { toCompact } from './utils/compact';
+export { eventDedupeKey, fetchCrashEvents, mapEventToNotification } from './api/crash-status';
+export { useNotifications } from './hooks/useNotifications';
 export type {
     AlertChannel,
+    CrashLocation,
+    CrashNotificationChannel,
+    CrashNotificationStatus,
+    CrashStatusEvent,
     Notification,
     NotifFilterState,
     NotificationType,

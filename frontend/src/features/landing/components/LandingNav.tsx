@@ -4,15 +4,16 @@ import { Link, useRouterState } from '@tanstack/react-router';
 import { Menu, X } from 'lucide-react';
 
 import { cn } from '@/lib/utils';
+import { useNotificationsStore } from '@/store/notifications';
 
 type NavKey = 'overview' | 'dashboard' | 'map' | 'cameras' | 'notifications';
 
-const NAV_ITEMS: { key: NavKey; label: string; badge?: number }[] = [
+const NAV_ITEMS: { key: NavKey; label: string }[] = [
     { key: 'overview', label: 'Overview' },
     { key: 'dashboard', label: 'Dashboard' },
     { key: 'map', label: 'Map' },
     { key: 'cameras', label: 'Cameras' },
-    { key: 'notifications', label: 'Notifications', badge: 2 },
+    { key: 'notifications', label: 'Notifications' },
 ];
 
 const ROUTES: Partial<Record<NavKey, '/' | '/notifications'>> = {
@@ -24,6 +25,7 @@ export function LandingNav() {
     const pathname = useRouterState({ select: (s) => s.location.pathname });
     const btnSheenRef = useRef<HTMLSpanElement>(null);
     const [isMenuOpen, setIsMenuOpen] = useState(false);
+    const notifBadge = useNotificationsStore((s) => s.newCount);
 
     function isActive(key: NavKey) {
         if (key === 'overview') return pathname === '/';
@@ -101,10 +103,11 @@ export function LandingNav() {
                                     'active:translate-y-0 active:scale-[0.98]',
                                     active ? 'bg-black/5 text-neutral-900' : 'text-neutral-600',
                                 );
+                                const badgeCount = item.key === 'notifications' ? notifBadge : 0;
                                 const badge =
-                                    item.badge != null && item.badge > 0 ? (
+                                    badgeCount > 0 ? (
                                         <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#E5484D] font-jetbrains text-[11px] font-bold text-white flex-none tabular-nums">
-                                            {item.badge}
+                                            {badgeCount > 99 ? '99+' : badgeCount}
                                         </span>
                                     ) : null;
                                 const route = ROUTES[item.key];
@@ -196,10 +199,11 @@ export function LandingNav() {
                                         ? 'text-neutral-900 bg-black/5'
                                         : 'text-neutral-500 hover:text-neutral-900 hover:bg-black/[0.03]',
                                 );
+                                const badgeCount = item.key === 'notifications' ? notifBadge : 0;
                                 const badge =
-                                    item.badge != null && item.badge > 0 ? (
+                                    badgeCount > 0 ? (
                                         <span className="inline-flex items-center justify-center min-w-[18px] h-[18px] px-[5px] rounded-full bg-[#E5484D] font-jetbrains text-[11px] font-bold text-white flex-none tabular-nums">
-                                            {item.badge}
+                                            {badgeCount > 99 ? '99+' : badgeCount}
                                         </span>
                                     ) : null;
                                 const route = ROUTES[item.key];

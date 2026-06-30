@@ -1,19 +1,19 @@
-import { ArrowDown, ArrowUp, ArrowUpDown } from 'lucide-react';
-import { useState } from 'react';
+import { ArrowDown, ArrowUp, ArrowUpDown, ChevronsUp } from 'lucide-react';
+import { useEffect, useLayoutEffect, useRef, useState } from 'react';
 import type { CSSProperties } from 'react';
 
 import { LandingNav } from '@/features/landing';
 import {
-    INCIDENT_ZONE_TOTALS,
-    MOCK_NOTIFICATIONS,
     NotificationRow,
     NotificationsControls,
     toCompact,
+    useNotifications,
     type Notification,
     type NotifFilterState,
     type PeriodFilter,
     type ViewMode,
 } from '@/features/notifications';
+import { useNotificationsStore } from '@/store/notifications';
 
 const ALL: NotifFilterState = { crashes: true, sms: true, v2x: true };
 
@@ -72,21 +72,34 @@ export function NotificationsPage() {
     const [view, setView] = useState<ViewMode>('detailed');
     const [sort, setSort] = useState<SortMode>('default');
 
+    const setViewingLive = useNotificationsStore((s) => s.setViewingLive);
+    const scrollRef = useRef<HTMLDivElement>(null);
+    const prevScrollHeightRef = useRef<number>(0);
+    const [showScrollTop, setShowScrollTop] = useState(false);
+
+    // Badge should not grow when viewing live data on this page
+    useEffect(() => {
+        const isViewingLive = period !== 'past';
+        setViewingLive(isViewingLive);
+        return () => setViewingLive(false);
+    }, [period, setViewingLive]);
+
+    const { notifications } = useNotifications(period);
+
+    const handlePeriodChange = (p: PeriodFilter) => {
+        setPeriod(p);
+        setSort('default');
+    };
+
     const handleViewChange = (v: ViewMode) => {
         setView(v);
-        if (v === 'compact' && sort === 'target') setSort('default');
     };
 
     const handleSort = (col: SortMode) => {
-        if (col === 'target' && view === 'compact') return;
         setSort((prev) => (prev === col ? 'default' : col));
     };
 
-    const timeSorted = [...MOCK_NOTIFICATIONS].sort((a, b) => b.ts - a.ts);
-
-    const filtered = timeSorted.filter((n) => {
-        if (period === 'live' && !n.live) return false;
-        if (period === 'past' && n.live) return false;
+    const filtered = notifications.filter((n) => {
         if (n.type === 'crash' && !filter.crashes) return false;
         if (n.type === 'alert' && n.channel === 'sms' && !filter.sms) return false;
         if (n.type === 'alert' && n.channel === 'v2x' && !filter.v2x) return false;
@@ -98,19 +111,48 @@ export function NotificationsPage() {
         return true;
     });
 
-    const sortedFiltered = applySort(filtered, sort);
     const displayed =
-        view === 'compact' ? toCompact(sortedFiltered, INCIDENT_ZONE_TOTALS) : sortedFiltered;
+        view === 'compact' ? applySort(toCompact(filtered, {}), sort) : applySort(filtered, sort);
 
-    const liveCount = MOCK_NOTIFICATIONS.filter((n) => n.live).length;
-    const countLabel = `${MOCK_NOTIFICATIONS.length} total · ${liveCount} live this session`;
+    const liveCount = notifications.filter((n) => n.live).length;
+    const countLabel = `${notifications.length} total · ${liveCount} live this session`;
 
-    const targetDisabled = view === 'compact';
+    const hasContent = displayed.length > 0;
 
-    const thStyle = (col: SortMode, disabled = false): CSSProperties => ({
+    // Show scroll-to-top button while the user has scrolled down
+    useEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+        const onScroll = () => setShowScrollTop(el.scrollTop > 0);
+        el.addEventListener('scroll', onScroll, { passive: true });
+        return () => el.removeEventListener('scroll', onScroll);
+    }, [hasContent]);
+
+    // Reset anchor whenever filters, sort, or view change so scroll returns to top
+    useLayoutEffect(() => {
+        prevScrollHeightRef.current = 0;
+        setShowScrollTop(false);
+        if (scrollRef.current) scrollRef.current.scrollTop = 0;
+    }, [sort, filter, search, period, view]);
+
+    // When new items are prepended (live websocket), keep user's visual position fixed
+    useLayoutEffect(() => {
+        const el = scrollRef.current;
+        if (!el) return;
+
+        const prevHeight = prevScrollHeightRef.current;
+        if (prevHeight > 0 && el.scrollTop > 0) {
+            const diff = el.scrollHeight - prevHeight;
+            if (diff > 0) el.scrollTop = el.scrollTop + diff;
+        }
+
+        prevScrollHeightRef.current = el.scrollHeight;
+    }, [displayed]);
+
+    const thStyle = (col: SortMode): CSSProperties => ({
         ...TH_BASE,
-        color: disabled ? '#C0C2BC' : sort === col ? '#16181B' : '#777C90',
-        cursor: disabled ? 'default' : 'pointer',
+        color: sort === col ? '#16181B' : '#777C90',
+        cursor: 'pointer',
     });
 
     const iconStyle: CSSProperties = {
@@ -120,8 +162,7 @@ export function NotificationsPage() {
         flexShrink: 0,
     };
 
-    const sortIcon = (col: SortMode, disabled = false) => {
-        if (disabled) return null;
+    const sortIcon = (col: SortMode) => {
         if (sort === col) return <ArrowUp size={11} style={iconStyle} />;
         if (col === 'time') return <ArrowDown size={11} style={iconStyle} />;
         return <ArrowUpDown size={11} style={iconStyle} />;
@@ -188,7 +229,7 @@ export function NotificationsPage() {
                         filter={filter}
                         search={search}
                         view={view}
-                        onPeriodChange={setPeriod}
+                        onPeriodChange={handlePeriodChange}
                         onFilterChange={setFilter}
                         onSearchChange={setSearch}
                         onViewChange={handleViewChange}
@@ -197,7 +238,13 @@ export function NotificationsPage() {
                     {/* Transparent flex:1 wrapper: lets the white box shrink to content
                          while max-height:100% caps it at the remaining viewport space */}
                     <div
-                        style={{ flex: 1, minHeight: 0, overflow: 'hidden', paddingBottom: '24px' }}
+                        style={{
+                            flex: 1,
+                            minHeight: 0,
+                            overflow: 'hidden',
+                            paddingBottom: '24px',
+                            position: 'relative',
+                        }}
                     >
                         <div
                             style={{
@@ -222,7 +269,7 @@ export function NotificationsPage() {
                                     No notifications match these filters.
                                 </div>
                             ) : (
-                                <div style={{ flex: 1, overflowY: 'auto' }}>
+                                <div ref={scrollRef} style={{ flex: 1, overflowY: 'auto' }}>
                                     <table
                                         style={{
                                             width: '100%',
@@ -232,9 +279,9 @@ export function NotificationsPage() {
                                     >
                                         <colgroup>
                                             <col style={{ width: '90px' }} />
-                                            <col style={{ width: '140px' }} />
-                                            <col />
-                                            <col style={{ width: '185px' }} />
+                                            <col style={{ width: '210px' }} />
+                                            <col style={{ width: '340px' }} />
+                                            <col style={{ width: '210px' }} />
                                         </colgroup>
                                         <thead>
                                             <tr>
@@ -245,10 +292,10 @@ export function NotificationsPage() {
                                                     Channel{sortIcon('channel')}
                                                 </th>
                                                 <th
-                                                    style={thStyle('target', targetDisabled)}
+                                                    style={thStyle('target')}
                                                     onClick={() => handleSort('target')}
                                                 >
-                                                    Target{sortIcon('target', targetDisabled)}
+                                                    Target{sortIcon('target')}
                                                 </th>
                                                 <th
                                                     style={thStyle('message')}
@@ -285,6 +332,36 @@ export function NotificationsPage() {
                                 </div>
                             )}
                         </div>
+
+                        <button
+                            onClick={() => {
+                                scrollRef.current?.scrollTo({ top: 0, behavior: 'smooth' });
+                            }}
+                            aria-label="Scroll to top"
+                            style={{
+                                position: 'absolute',
+                                bottom: '32px',
+                                right: '12px',
+                                width: '44px',
+                                height: '44px',
+                                borderRadius: '50%',
+                                border: 'none',
+                                background: '#16181B',
+                                color: '#E4FB52',
+                                display: 'flex',
+                                alignItems: 'center',
+                                justifyContent: 'center',
+                                cursor: 'pointer',
+                                boxShadow: '0 4px 16px rgba(0,0,0,0.22)',
+                                opacity: showScrollTop ? 1 : 0,
+                                transform: showScrollTop ? 'translateY(0)' : 'translateY(10px)',
+                                pointerEvents: showScrollTop ? 'auto' : 'none',
+                                transition: 'opacity 0.22s ease, transform 0.22s ease',
+                                zIndex: 50,
+                            }}
+                        >
+                            <ChevronsUp size={20} />
+                        </button>
                     </div>
                 </div>
             </main>

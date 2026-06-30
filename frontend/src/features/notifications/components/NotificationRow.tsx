@@ -61,6 +61,82 @@ function fmtAbs(ts: number): string {
 
 const MONO: CSSProperties = { fontFamily: "'JetBrains Mono', monospace" };
 
+function CoordsTooltip({
+    desc,
+    loc,
+    coords,
+}: {
+    desc: string;
+    loc: string;
+    coords: string | null;
+}) {
+    const [pos, setPos] = useState<{ x: number; y: number } | null>(null);
+
+    // Only underline when there is a road name distinct from raw coords
+    const hasRoadName = coords !== null && loc !== coords;
+    const idx = hasRoadName ? desc.indexOf(loc) : -1;
+
+    if (!hasRoadName || idx === -1) {
+        return <span style={{ fontSize: '13.5px', color: '#54564F' }}>{desc}</span>;
+    }
+
+    const before = desc.slice(0, idx);
+    const after = desc.slice(idx + loc.length);
+
+    return (
+        <span style={{ fontSize: '13.5px', color: '#54564F' }}>
+            {before}
+            <span
+                style={{
+                    borderBottom: '1px dashed rgba(119,124,144,0.45)',
+                    cursor: 'default',
+                    paddingBottom: '1px',
+                }}
+                onMouseEnter={(e) => {
+                    const r = e.currentTarget.getBoundingClientRect();
+                    setPos({ x: r.left, y: r.top });
+                }}
+                onMouseLeave={() => setPos(null)}
+            >
+                {loc}
+            </span>
+            {pos && (
+                <div
+                    style={{
+                        position: 'fixed',
+                        top: pos.y - 8,
+                        left: pos.x,
+                        transform: 'translateY(-100%)',
+                        zIndex: 200,
+                        background: '#282930',
+                        border: '1px solid rgba(255,255,255,0.08)',
+                        borderRadius: '8px',
+                        padding: '6px 10px',
+                        boxShadow: '0 4px 16px rgba(0,0,0,0.32)',
+                        pointerEvents: 'none',
+                    }}
+                >
+                    <span style={{ ...MONO, fontSize: '11px', color: '#A0A3A8' }}>{coords}</span>
+                    <div
+                        style={{
+                            position: 'absolute',
+                            bottom: '-5px',
+                            left: '10px',
+                            width: '8px',
+                            height: '8px',
+                            background: '#282930',
+                            borderRight: '1px solid rgba(255,255,255,0.08)',
+                            borderBottom: '1px solid rgba(255,255,255,0.08)',
+                            transform: 'rotate(45deg)',
+                        }}
+                    />
+                </div>
+            )}
+            {after}
+        </span>
+    );
+}
+
 function CompactTargetCell({
     label,
     details,
@@ -242,7 +318,11 @@ export function NotificationRow({ notification, isLast }: NotificationRowProps) 
                 )}
             </td>
             <td style={{ ...td, textOverflow: 'ellipsis' }}>
-                <span style={{ fontSize: '13.5px', color: '#54564F' }}>{notification.desc}</span>
+                <CoordsTooltip
+                    desc={notification.desc}
+                    loc={notification.loc}
+                    coords={notification.coords}
+                />
             </td>
             <td style={td}>
                 <div

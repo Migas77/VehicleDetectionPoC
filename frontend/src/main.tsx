@@ -2,6 +2,7 @@ import { StrictMode } from 'react';
 import { createRoot } from 'react-dom/client';
 import { createRouter, RouterProvider } from '@tanstack/react-router';
 import { routeTree } from './routeTree.gen';
+import { CrashStatusWsProvider } from './providers/crash-status-ws-provider';
 import { QueryProvider } from './providers/query-provider';
 import './index.css';
 
@@ -16,7 +17,9 @@ declare module '@tanstack/react-router' {
 createRoot(document.getElementById('root')!).render(
     <StrictMode>
         <QueryProvider>
-            <RouterProvider router={router} />
+            <CrashStatusWsProvider>
+                <RouterProvider router={router} />
+            </CrashStatusWsProvider>
         </QueryProvider>
     </StrictMode>,
 );

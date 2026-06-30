@@ -36,19 +36,18 @@ export function toCompact(
             rows.push({
                 ...sms[0],
                 target: `${sms.length}/${total} PED`,
-                desc: `Crash alert sent to ${sms.length} pedestrian${sms.length !== 1 ? 's' : ''} in the affected zone. - AveiroSafe`,
+                desc: `SMS alert sent to ${sms.length} pedestrian${sms.length !== 1 ? 's' : ''} near ${sms[0].loc}.`,
                 compactDetails: { notified: sms.map((n) => n.target), totalInZone: total },
             });
         }
 
         const v2x = group.filter((n) => n.channel === 'v2x');
         if (v2x.length > 0) {
-            const total = zone?.veh ?? v2x.length;
             rows.push({
                 ...v2x[0],
-                target: `${v2x.length}/${total} VEH`,
-                desc: `DENM broadcast delivered to ${v2x.length} vehicle${v2x.length !== 1 ? 's' : ''} in the affected zone.`,
-                compactDetails: { notified: v2x.map((n) => n.target), totalInZone: total },
+                target: 'VEH-MULTICAST',
+                desc: `DENM geo-multicast near ${v2x[0].loc}.`,
+                compactDetails: undefined,
             });
         }
     }
