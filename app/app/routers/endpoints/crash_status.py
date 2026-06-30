@@ -1,7 +1,8 @@
 import logging
+from datetime import datetime, timezone
 from uuid import UUID
 
-from fastapi import APIRouter
+from fastapi import APIRouter, HTTPException, Query
 
 from app.drivers.crash_status import CrashStatusBrokerDep
 from app.schemas.poc.crash_status import CrashStatusEvent
@@ -11,14 +12,22 @@ LOG = logging.getLogger(__name__)
 router = APIRouter(prefix="/crash-status")
 
 
-@router.get("/incidents")
-async def list_incidents(
+@router.get("/events")
+async def list_events(
     broker: CrashStatusBrokerDep,
     limit: int = 50,
     offset: int = 0,
+    before: datetime | None = Query(default=None),
 ) -> list[CrashStatusEvent]:
-    """List incidents most-recent first, returning the DETECTED event for each."""
-    return await broker.list_incidents(offset=offset, limit=limit)
+    """List all crash status events, most-recent first."""
+    if before is not None:
+        if before.tzinfo is None:
+            before = before.replace(tzinfo=timezone.utc)
+        if before > datetime.now(timezone.utc):
+            raise HTTPException(
+                status_code=422, detail="`before` must not be a future datetime"
+            )
+    return await broker.list_events(before=before, offset=offset, limit=limit)
 
 
 @router.get("/incidents/{incident_id}")

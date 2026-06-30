@@ -1,6 +1,7 @@
 import asyncio
 import logging
 from abc import ABC, abstractmethod
+from datetime import datetime
 
 from app.schemas.poc.crash_status import CrashStatusEvent
 
@@ -21,8 +22,10 @@ class CrashStatusBrokerInterface(ABC):
         """Persist the event to Redis and fan out to all currently connected WebSocket clients."""
 
     @abstractmethod
-    async def list_incidents(self, offset: int, limit: int) -> list[CrashStatusEvent]:
-        """Return the DETECTED event for each incident, most-recent first."""
+    async def list_events(
+        self, before: datetime | None, offset: int, limit: int
+    ) -> list[CrashStatusEvent]:
+        """Return crash status events, most-recent first, with timestamp strictly before `before` (or all if None)."""
 
     @abstractmethod
     async def get_incident(self, incident_id: str) -> list[CrashStatusEvent]:
