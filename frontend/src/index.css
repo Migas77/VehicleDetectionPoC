@@ -4,6 +4,36 @@
 @import '@fontsource-variable/geist';
 
 /* ── VIGIA animations ────────────────────────────────────────────── */
+@keyframes vg-sheen {
+    from {
+        transform: translateX(-100%);
+    }
+    to {
+        transform: translateX(200%);
+    }
+}
+
+@keyframes vg-btn-sheen {
+    from {
+        transform: translate(-125%);
+    }
+    to {
+        transform: translate(125%);
+    }
+}
+
+.vg-sheen-overlay {
+    pointer-events: none;
+    position: absolute;
+    inset: 0;
+    background: linear-gradient(90deg, transparent, rgba(255, 255, 255, 0.38), transparent);
+    transform: translateX(-100%);
+}
+
+.group\/logo:hover .vg-sheen-overlay {
+    animation: vg-sheen 0.65s cubic-bezier(0.16, 1, 0.3, 1) forwards;
+}
+
 @keyframes vg-blink {
     0%,
     100% {

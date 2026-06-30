@@ -10,28 +10,29 @@ const FEATURE_CARDS = [
         body: 'Standardised CAMARA endpoints (Device Location, Device Status, Quality-on-Demand) let any operator integrate the same way, anywhere.',
     },
     {
-        tag: '🔒',
+        tag: 'CAP',
         title: 'Secured by CAPIF',
         body: 'The Common API Framework authenticates and authorises every service call between VIGIA, the cameras and the 5G core — zero implicit trust.',
+    },
+    {
+        tag: 'MSG',
+        title: 'Notifications',
+        body: 'SMS alerts reach nearby pedestrians. CCAM DENM messages are multicasted directly to connected vehicles using a geospatial quadtree tiling scheme.',
     },
 ] as const;
 
 export function FeaturesSection() {
     return (
         <section className="max-w-[1320px] mx-auto px-4 sm:px-7 pt-[78px] pb-5">
-            <div className="flex items-end justify-between gap-6 flex-wrap">
-                <div>
-                    <div className="font-jetbrains text-[12px] tracking-[0.12em] text-[#8A8C86]">
-                        [ 01 ] CAPABILITIES
-                    </div>
-                    <h2 className="font-grotesk font-bold text-[32px] sm:text-[40px] tracking-[-0.025em] mt-3 mb-0 max-w-[620px] leading-[1.08] text-[#16181B]">
-                        A complete response loop, from lens to alert
-                    </h2>
+            <div>
+                <div className="font-jetbrains text-[12px] tracking-[0.12em] text-[#8A8C86]">
+                    [ 01 ] CAPABILITIES
                 </div>
-                <p className="max-w-[340px] text-[#54564F] text-[15.5px] leading-[1.6]">
-                    Every part runs at the network edge so detection and notification happen inside
-                    the same 5G slice — no round trip to the cloud.
-                </p>
+                <h2 className="font-grotesk font-bold text-[32px] sm:text-[40px] tracking-[-0.025em] mt-3 mb-0 max-w-[620px] leading-[1.08] text-[#16181B]">
+                    A complete response loop,
+                    <br />
+                    from lens to alert
+                </h2>
             </div>
 
             <div className="grid grid-cols-1 sm:grid-cols-2 gap-[18px] mt-10">
@@ -46,19 +47,11 @@ export function FeaturesSection() {
                         AI crash detection
                     </h3>
                     <p className="text-[#A6A8A1] text-[15px] leading-[1.6] mt-3 mb-0">
-                        A computer‑vision model runs on each roadside camera, classifying
-                        collisions, near‑misses and stopped vehicles frame‑by‑frame with confidence
-                        scoring — robust to night, rain and glare.
+                        A computer‑vision model, running at the edge, observes each roadside camera
+                        video stream, classifying vehicle collisions frame‑by‑frame, with a
+                        confidence scoring.
                     </p>
                     <div className="mt-auto pt-6 flex gap-6">
-                        <div>
-                            <div className="font-grotesk font-bold text-[24px] text-[#E4FB52]">
-                                98.2%
-                            </div>
-                            <div className="text-[12.5px] text-[#84867F] mt-0.5">
-                                detection precision
-                            </div>
-                        </div>
                         <div>
                             <div className="font-grotesk font-bold text-[24px] text-[#E4FB52]">
                                 30fps
@@ -66,6 +59,12 @@ export function FeaturesSection() {
                             <div className="text-[12.5px] text-[#84867F] mt-0.5">
                                 edge inference
                             </div>
+                        </div>
+                        <div>
+                            <div className="font-grotesk font-bold text-[24px] text-[#E4FB52]">
+                                100%
+                            </div>
+                            <div className="text-[12.5px] text-[#84867F] mt-0.5">automation</div>
                         </div>
                     </div>
                 </div>

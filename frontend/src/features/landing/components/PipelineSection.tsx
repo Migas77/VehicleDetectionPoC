@@ -9,11 +9,11 @@ const STEPS = [
     },
     {
         step: '02',
-        glyph: '⚡',
+        glyph: '▲',
         iconBg: '#E4FB52',
         iconColor: '#16181B',
         title: 'Detect',
-        body: 'On-device CV model classifies the collision and scores confidence in <60 ms.',
+        body: 'Edge CV model classifies the collision and scores confidence in <60 ms.',
     },
     {
         step: '03',

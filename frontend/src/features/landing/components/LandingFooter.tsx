@@ -8,7 +8,7 @@ export function LandingFooter() {
                     </div>
                     <span className="font-grotesk font-bold text-[15px] text-[#16181B]">VIGIA</span>
                     <span className="text-[#9A9C95] text-[13px] ml-1.5">
-                        Vehicle Incident Guardian · PoC · Aveiro
+                        Vehicle Incident Guardian · PoC · IT · Aveiro
                     </span>
                 </div>
                 <span className="font-jetbrains text-[11.5px] text-[#9A9C95]">

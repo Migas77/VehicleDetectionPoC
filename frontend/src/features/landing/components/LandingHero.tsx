@@ -4,8 +4,8 @@ import { CameraFeedMock } from './CameraFeedMock';
 
 const STATS = [
     { value: '<180', unit: 'ms', label: 'detect → alert latency' },
-    { value: '250', unit: 'm', label: 'alert broadcast radius' },
     { value: '24/7', unit: '', label: 'autonomous monitoring' },
+    { value: '2', unit: '', label: 'alert channels' },
 ] as const;
 
 export function LandingHero() {
@@ -14,14 +14,6 @@ export function LandingHero() {
             <div className="grid grid-cols-1 lg:grid-cols-[1.1fr_0.9fr] gap-10 lg:gap-14 items-center">
                 {/* Left column */}
                 <div>
-                    <div className="inline-flex items-center gap-2 px-3.5 py-[7px] rounded-[20px] bg-white border border-[#E6E4DC] font-jetbrains text-[11.5px] tracking-[0.06em] text-[#45473F]">
-                        <span
-                            className="w-[7px] h-[7px] rounded-full bg-[#E4FB52]"
-                            style={{ boxShadow: '0 0 0 3px rgba(228,251,82,0.25)' }}
-                        />
-                        AI INCIDENT RESPONSE · 5G CORE
-                    </div>
-
                     <h1 className="font-grotesk font-bold text-[42px] sm:text-[52px] lg:text-[62px] tracking-[-0.03em] mt-[22px] mb-0 leading-[1.02] text-[#16181B]">
                         Detect crashes.
                         <br />
@@ -42,8 +34,10 @@ export function LandingHero() {
 
                     <p className="text-[18px] leading-[1.6] text-[#54564F] max-w-[480px] mt-6 mb-0">
                         VIGIA watches the road through roadside cameras, detects collisions with
-                        on‑device AI, and instantly alerts the pedestrians and vehicles around the
-                        impact — over the 5G core, before help is even called.
+                        edge AI, and instantly alerts pedestrians and vehicles around the area of
+                        impact,
+                        <br />
+                        over 5G.
                     </p>
 
                     <div className="flex flex-wrap gap-3 mt-8">

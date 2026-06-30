@@ -13,7 +13,7 @@ export function LandingPage() {
     return (
         <div className="min-h-screen font-dm" style={{ background: '#F4F3EE', color: '#16181B' }}>
             <LandingNav />
-            <main>
+            <main className="pt-20">
                 <LandingHero />
                 <TrustStrip />
                 <FeaturesSection />
