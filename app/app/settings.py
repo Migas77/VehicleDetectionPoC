@@ -57,13 +57,24 @@ class SurveyedAreaConfig(BaseModel):
 
 class CameraInferenceConfig(BaseModel):
     inference_enabled: bool = False
-    video_reference: str | None = None
+    stream_protocol: str | None = None
+    stream_ip: str | None = None
+    stream_port: int | None = None
+    stream_path: str | None = None
     max_fps: int = 15
 
     @model_validator(mode="after")
     def _validate_when_enabled(self) -> "CameraInferenceConfig":
-        if self.inference_enabled and self.video_reference is None:
-            raise ValueError("video_reference is required when inference_enabled=true")
+        if self.inference_enabled and (
+            self.stream_protocol is None
+            or self.stream_ip is None
+            or self.stream_port is None
+            or self.stream_path is None
+        ):
+            raise ValueError(
+                "stream_protocol, stream_ip, stream_port and stream_path are "
+                "required when inference_enabled=true"
+            )
         return self
 
 
@@ -118,6 +129,24 @@ class CamerasSettings(BaseModel):
             or self.inference.get("default")
             or CameraInferenceConfig()
         )
+
+    def get_enabled_inference_by_ue_supi(
+        self, ue_supi: str
+    ) -> tuple[str, CameraInferenceConfig] | None:
+        """Return (video_reference, inference_config) if inference is enabled for this camera.
+
+        The video_reference URL is built from the inference config's stream fields.
+        Returns None unless inference is enabled for this camera — validator
+        guarantees stream_protocol/ip/port/path are set whenever inference_enabled=True.
+        """
+        inference_config = self.get_inference_config_by_ue_supi(ue_supi)
+        if not inference_config.inference_enabled:
+            return None
+        video_reference = (
+            f"{inference_config.stream_protocol}://{inference_config.stream_ip}:"
+            f"{inference_config.stream_port}/{inference_config.stream_path}"
+        )
+        return video_reference, inference_config
 
 
 class CcamBrokerSettings(BaseModel):

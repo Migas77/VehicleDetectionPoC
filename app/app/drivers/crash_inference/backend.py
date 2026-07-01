@@ -116,13 +116,14 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
         )
 
     async def start_pipeline(self, camera: CameraUE) -> str | None:
-        inference_config = settings.cameras.get_inference_config_by_ue_supi(camera.supi)
-        if not inference_config.inference_enabled:
+        enabled_inference = settings.cameras.get_enabled_inference_by_ue_supi(
+            camera.supi
+        )
+        if enabled_inference is None:
             LOG.debug("Inference not enabled for camera supi=%s, skipping", camera.supi)
             return None
 
-        # validator guarantees video_reference is set when inference_enabled=True
-        video_reference = inference_config.video_reference
+        video_reference, inference_config = enabled_inference
         LOG.info(
             "Starting crash inference pipeline (camera_supi=%s, model=%s, video=%s)",
             camera.supi,
