@@ -284,6 +284,7 @@ export function MapView({ showHeader = true }: MapViewProps) {
                     borderRadius: '18px',
                     overflow: 'hidden',
                     position: 'relative',
+                    isolation: 'isolate',
                     height: 'calc(100vh - 210px)',
                     minHeight: '480px',
                 }}
