@@ -195,6 +195,7 @@ class Settings(BaseSettings):
     poc_af_id: str
     poc_app_server: str
     log_level: LogLevel = "INFO"
+    cors_allow_origins: list[str]
 
     roboflow: RoboflowSettings
 

@@ -2,6 +2,7 @@ log_level = "INFO"
 poc_title = "Vehicle Crash Detection PoC"
 poc_af_id = "VehicleCrashDetectionPoC"
 poc_app_server = "10.100.0.1"
+cors_allow_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
 [net_apis]
 api = "camara"

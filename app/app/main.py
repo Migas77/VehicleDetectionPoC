@@ -5,6 +5,7 @@ from contextlib import asynccontextmanager
 from typing import cast, Iterable
 
 from fastapi import FastAPI
+from fastapi.middleware.cors import CORSMiddleware
 
 from app.drivers import router as drivers_router
 from app.drivers.analytics import AnalyticsInterfaceDep
@@ -225,6 +226,13 @@ async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
 
 
 app = FastAPI(title=settings.poc_title, lifespan=lifespan)
+app.add_middleware(
+    CORSMiddleware,
+    allow_origins=settings.cors_allow_origins,
+    allow_credentials=False,
+    allow_methods=["*"],
+    allow_headers=["*"],
+)
 app.include_router(drivers_router)
 app.include_router(routers_router)
 
