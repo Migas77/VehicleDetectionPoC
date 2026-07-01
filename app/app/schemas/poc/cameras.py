@@ -1,10 +1,11 @@
 import logging
 from typing import Annotated, Any
 
-from pydantic import Field, model_validator
+from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.poc.ue_with_qos import UeWithQoS
-from app.settings import settings
+from app.schemas.qos_profile import QosProfile
+from app.settings import CameraInferenceConfig, SurveyedAreaConfig, settings
 
 LOG = logging.getLogger(__name__)
 
@@ -40,3 +41,12 @@ class StaticCameraUE(CameraUE):
 
 class DynamicCameraUE(CameraUE):
     name: Annotated[str, Field(pattern=r"^dcamera-")]
+
+
+class CameraInfo(BaseModel):
+    """Full per-camera configuration, as resolved from cameras.toml."""
+
+    ue_supi: str
+    qos_profile: QosProfile
+    surveyed_area: SurveyedAreaConfig
+    inference: CameraInferenceConfig

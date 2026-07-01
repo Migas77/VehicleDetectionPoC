@@ -1,5 +1,10 @@
 from app.schemas.poc.area import SurveyedArea
-from app.schemas.poc.cameras import CameraUE, DynamicCameraUE, StaticCameraUE
+from app.schemas.poc.cameras import (
+    CameraInfo,
+    CameraUE,
+    DynamicCameraUE,
+    StaticCameraUE,
+)
 from app.schemas.poc.car import CarUE
 from app.schemas.poc.crash_status import (
     CrashLocation,
@@ -16,6 +21,7 @@ from app.schemas.poc.ue_with_qos import UeWithQoS
 __all__ = [
     "UE",
     "UeWithQoS",
+    "CameraInfo",
     "CameraUE",
     "CarUE",
     "StaticCameraUE",
