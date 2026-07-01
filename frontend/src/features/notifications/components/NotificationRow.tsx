@@ -2,62 +2,9 @@ import { Check, X } from 'lucide-react';
 import { useState } from 'react';
 import type { CSSProperties } from 'react';
 
-import type { AlertChannel, Notification, NotificationType } from '../types';
-
-function ChannelBadge({ type, channel }: { type: NotificationType; channel?: AlertChannel }) {
-    let bg: string, label: string;
-
-    if (type === 'crash') {
-        [bg, label] = ['#E5484D', 'CRASH'];
-    } else if (channel === 'sms') {
-        [bg, label] = ['#2F9E63', 'SMS'];
-    } else {
-        [bg, label] = ['#142F32', 'V2X'];
-    }
-
-    return (
-        <span
-            style={{
-                display: 'inline-block',
-                width: '52px',
-                textAlign: 'center',
-                padding: '3px 0',
-                borderRadius: '6px',
-                background: bg,
-                color: '#FFFFFF',
-                fontFamily: "'JetBrains Mono', monospace",
-                fontSize: '11px',
-                fontWeight: 700,
-                letterSpacing: '0.05em',
-            }}
-        >
-            {label}
-        </span>
-    );
-}
-
-function fmtRel(ts: number): string {
-    const elapsed = Math.floor((Date.now() - ts) / 1000);
-    if (elapsed < 5) return 'just now';
-    if (elapsed < 60) return `${elapsed}s ago`;
-    const mn = Math.floor(elapsed / 60);
-    if (mn < 60) return `${mn}m ago`;
-    const h = Math.floor(mn / 60);
-    if (h < 24) return `${h}h ago`;
-    return `${Math.floor(h / 24)}d ago`;
-}
-
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
-
-function fmtAbs(ts: number): string {
-    const d = new Date(ts);
-    const mon = MONTHS[d.getMonth()];
-    const day = d.getDate();
-    const h = String(d.getHours()).padStart(2, '0');
-    const m = String(d.getMinutes()).padStart(2, '0');
-    const s = String(d.getSeconds()).padStart(2, '0');
-    return `${mon} ${day}, ${h}:${m}:${s}`;
-}
+import type { Notification } from '../types';
+import { fmtAbs, fmtRel } from '../utils/format';
+import { ChannelBadge } from './ChannelBadge';
 
 const MONO: CSSProperties = { fontFamily: "'JetBrains Mono', monospace" };
 

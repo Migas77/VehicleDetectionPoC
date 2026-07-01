@@ -95,6 +95,11 @@ export function NotificationsPage() {
         setView(v);
     };
 
+    const handleReset = () => {
+        setFilter(ALL);
+        setSearch('');
+    };
+
     const handleSort = (col: SortMode) => {
         setSort((prev) => (prev === col ? 'default' : col));
     };
@@ -187,7 +192,7 @@ export function NotificationsPage() {
             >
                 <div
                     style={{
-                        maxWidth: '1100px',
+                        maxWidth: '1480px',
                         width: '100%',
                         margin: '0 auto',
                         padding: '22px 24px 0',
@@ -233,6 +238,7 @@ export function NotificationsPage() {
                         onFilterChange={setFilter}
                         onSearchChange={setSearch}
                         onViewChange={handleViewChange}
+                        onReset={handleReset}
                     />
 
                     {/* Transparent flex:1 wrapper: lets the white box shrink to content

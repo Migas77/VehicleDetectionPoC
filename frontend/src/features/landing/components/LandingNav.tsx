@@ -16,8 +16,10 @@ const NAV_ITEMS: { key: NavKey; label: string }[] = [
     { key: 'notifications', label: 'Notifications' },
 ];
 
-const ROUTES: Partial<Record<NavKey, '/' | '/notifications'>> = {
+const ROUTES: Partial<Record<NavKey, '/' | '/dashboard' | '/map' | '/notifications'>> = {
     overview: '/',
+    dashboard: '/dashboard',
+    map: '/map',
     notifications: '/notifications',
 };
 
@@ -139,12 +141,12 @@ export function LandingNav() {
                         </div>
 
                         {/* CTA button */}
-                        <button
-                            type="button"
+                        <Link
+                            to="/dashboard"
                             onMouseEnter={handleBtnMouseEnter}
                             className={cn(
                                 'relative inline-flex h-9 items-center gap-1.5 overflow-hidden rounded-full',
-                                'bg-[#16181B] px-4 text-[13px] font-semibold text-[#F4F3EE]',
+                                'bg-[#16181B] px-4 text-[13px] font-semibold text-[#F4F3EE] no-underline',
                                 'shadow-[inset_0_1px_0_rgba(255,255,255,0.08)] ring-1 ring-black/20',
                                 'transition-[transform,box-shadow] duration-300 ease-[cubic-bezier(0.34,1.56,0.64,1)]',
                                 'hover:-translate-y-px hover:shadow-[0_6px_16px_-8px_rgba(15,15,15,0.4)]',
@@ -159,7 +161,7 @@ export function LandingNav() {
                             />
                             Live dashboard
                             <span className="w-1.5 h-1.5 rounded-full bg-[#E4FB52] shrink-0" />
-                        </button>
+                        </Link>
 
                         {/* Mobile hamburger toggle */}
                         <button

@@ -1,4 +1,4 @@
-import { Check, Filter, Search } from 'lucide-react';
+import { Check, Filter, RotateCcw, Search, X } from 'lucide-react';
 import { useLayoutEffect, useRef, useState } from 'react';
 
 import type { NotifFilterState, PeriodFilter, ViewMode } from '../types';
@@ -31,6 +31,7 @@ interface NotificationsControlsProps {
     onFilterChange: (f: NotifFilterState) => void;
     onSearchChange: (q: string) => void;
     onViewChange: (v: ViewMode) => void;
+    onReset: () => void;
 }
 
 function SegmentedControl<T extends string>({
@@ -365,6 +366,40 @@ function FilterDropdown({
     );
 }
 
+function ResetButton({ onReset }: { onReset: () => void }) {
+    return (
+        <button
+            type="button"
+            onClick={onReset}
+            aria-label="Reset filters and search"
+            title="Reset filters and search"
+            style={{
+                display: 'flex',
+                alignItems: 'center',
+                justifyContent: 'center',
+                width: `${CTRL_HEIGHT}px`,
+                height: `${CTRL_HEIGHT}px`,
+                boxSizing: 'border-box',
+                borderRadius: '10px',
+                cursor: 'pointer',
+                background: '#FFFFFF',
+                border: '1px solid #EAE8E0',
+                color: '#16181B',
+                flexShrink: 0,
+                transition: 'background 0.15s, border-color 0.15s',
+            }}
+            onMouseEnter={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#F4F3EE';
+            }}
+            onMouseLeave={(e) => {
+                (e.currentTarget as HTMLButtonElement).style.background = '#FFFFFF';
+            }}
+        >
+            <RotateCcw size={15} />
+        </button>
+    );
+}
+
 export function NotificationsControls({
     period,
     filter,
@@ -374,6 +409,7 @@ export function NotificationsControls({
     onFilterChange,
     onSearchChange,
     onViewChange,
+    onReset,
 }: NotificationsControlsProps) {
     return (
         <div
@@ -418,10 +454,36 @@ export function NotificationsControls({
                         minWidth: 0,
                     }}
                 />
+                {search.length > 0 && (
+                    <button
+                        type="button"
+                        onClick={() => onSearchChange('')}
+                        aria-label="Clear search"
+                        style={{
+                            display: 'flex',
+                            alignItems: 'center',
+                            justifyContent: 'center',
+                            width: '18px',
+                            height: '18px',
+                            borderRadius: '50%',
+                            border: 'none',
+                            background: '#EFEDE6',
+                            color: '#5C5E57',
+                            cursor: 'pointer',
+                            flexShrink: 0,
+                            padding: 0,
+                        }}
+                    >
+                        <X size={12} strokeWidth={2.5} />
+                    </button>
+                )}
             </div>
 
-            {/* Filter dropdown - last */}
+            {/* Filter dropdown */}
             <FilterDropdown filter={filter} onFilterChange={onFilterChange} />
+
+            {/* Reset filters + search - last */}
+            <ResetButton onReset={onReset} />
         </div>
     );
 }
