@@ -1,0 +1,23 @@
+apiVersion: v2
+name: crash-detection-poc-umbrella
+description: Umbrella chart deploying frontend and backend for the Crash Detection PoC
+type: application
+version: 0.0.1
+
+dependencies:
+  - name: crash-detection-poc-frontend
+    alias: frontend
+    version: "0.0.1"
+    repository: "file://../frontend"
+    condition: frontend.enabled
+
+  - name: crash-detection-poc-app
+    alias: backend
+    version: "0.0.1"
+    repository: "file://../app"
+    condition: backend.enabled
+
+  - name: redis
+    version: "25.3.9"
+    repository: "oci://registry-1.docker.io/bitnamicharts"
+    condition: redis.enabled

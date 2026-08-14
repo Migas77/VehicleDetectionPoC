@@ -1,0 +1,17 @@
+frontend:
+  enabled: true
+
+backend:
+  enabled: true
+  env:
+    - name: REDIS__URL
+      value: "redis://{{ .Release.Name }}-redis-master:6379"
+
+redis:
+  enabled: true
+  auth:
+    enabled: false
+  architecture: standalone
+  master:
+    persistence:
+      size: 1Gi

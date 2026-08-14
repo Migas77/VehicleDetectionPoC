@@ -218,6 +218,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         toml_file=["config.toml", "cameras.toml"],
         env_file=".env",
+        env_nested_delimiter="__"
     )
 
     poc_title: str
