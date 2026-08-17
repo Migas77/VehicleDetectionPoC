@@ -1,4 +1,7 @@
 import logging
+from functools import cached_property
+
+import httpx
 
 from pydantic import TypeAdapter
 
@@ -16,8 +19,9 @@ _PocUEListAdapter: TypeAdapter[list[PocUE]] = TypeAdapter(list[PocUE])
 class NefUEsBackend(UEsInterface):
     """Retrieves and classifies UEs from the NEF Emulator management API."""
 
-    def __init__(self) -> None:
-        self._client = settings.create_nef_auth_client()
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_nef_auth_client()
 
     async def get_ues(self) -> list[UE]:
         res = await self._client.get("/api/v1/UEs")

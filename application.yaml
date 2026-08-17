@@ -1,0 +1,124 @@
+apiVersion: argoproj.io/v1alpha1
+kind: Application
+metadata:
+  name: crash-detection-poc-frontend
+  namespace: argocd
+  finalizers:
+    - resources-finalizer.argocd.argoproj.io
+spec:
+  project: default
+  source:
+    repoURL: oci://ghcr.io/migas77/crash-detection-poc-umbrella
+    chart: crash-detection-poc-umbrella
+    targetRevision: "0.0.17"
+    helm:
+      parameters:
+        - name: frontend.image.tag
+          value: "0.0.3"
+        - name: backend.image.tag
+          value: "0.0.7"
+
+        # CAPIF invoker. Enabled solely by net_apis.auth_mode = "capif" in the
+        # configToml below; these values only configure it.
+        - name: backend.capif.ingressIP
+          value: "10.43.81.164"
+        # Must match an account created by capif/helm/scripts/06_create_capif_users.sh
+        - name: backend.capif.username
+          value: "poc-invoker"
+        - name: backend.capif.password
+          value: "password"
+      
+      valuesObject:
+        backend:
+          config:
+            
+            camerasToml: |
+              [cameras.qos_profiles]
+              QCI_1_voice = {qos_profile_name = "QCI_1_voice", min_ul_bitrate = "50 Kbps", max_ul_bitrate = "100 Kbps", min_dl_bitrate = "50 Kbps", max_dl_bitrate = "100 Kbps"}
+              QCI_2_voice = {qos_profile_name = "QCI_2_voice", min_ul_bitrate = "200 Kbps", max_ul_bitrate = "400 Kbps", min_dl_bitrate = "200 Kbps", max_dl_bitrate = "400 Kbps"}
+              [cameras.qos_profiles_assignment]
+              default              = "QCI_1_voice"
+              "202010000000006"    = "QCI_2_voice"
+              "202010000000007"    = "QCI_2_voice"
+              [cameras.surveyed_areas]
+              default              = {radius = 300}
+              "202010000000006"    = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}
+              "202010000000007"    = {radius = 200}
+              [cameras.inference]
+              default              = {inference_enabled = false}
+              "202010000000006"    = {inference_enabled = true, stream_protocol = "rtsp", stream_ip = "192.168.93.56", stream_port = 8554, stream_path = "mystream", max_fps = 15}
+            
+            configToml: |
+              log_level = "INFO"
+              poc_title = "Vehicle Crash Detection PoC"
+              poc_af_id = "VehicleCrashDetectionPoC"
+              poc_app_server = "10.100.0.1"
+              cors_allow_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
+
+              [net_apis]
+              api = "%s"
+              auth_mode = "%s"
+
+              [camara]
+              # not protected when net_apis.auth_mode = "other"
+              url = "%s"
+              poc_notification_url = "http://{{ .Release.Name }}-backend.poc.svc.cluster.local:80"
+
+              [nef]
+              # username and password required when net_apis.auth_mode = "other"
+              url = "%s"
+              username = "admin@my-email.com"
+              password = "pass"
+              poc_notification_url = "http://{{ .Release.Name }}-backend.poc.svc.cluster.local:80"
+
+              # [capif_sdk] host/port/credentials come from the chart's capif.* values
+              # (CAPIF_SDK__* env vars), so only the invoker defaults live here
+              [capif_sdk]
+              capif_username = "poc-invoker"
+              capif_password = "password"
+              capif_callback_url = "http://{{ .Release.Name }}-backend.poc.svc.cluster.local:80/callback/"
+
+              [analytics]
+              offset_period = -5
+              temporal_gran_size = 5
+              rep_period = 5
+
+              [roboflow]
+              api_key = "0CEH7j4W8B4kwCReiyrW"
+
+              [crash_inference]
+              model_id = "accident-detection-qgglm/3"
+              classes = ["Accident", "mild", "moderate", "severe"]
+              debounce_seconds = 4
+              intervention_threshold = 0.40
+              average_car_crash_duration = 0.20 # seconds
+              inference_server_url = "%s"
+              poc_notification_url = "http://crash-detection-poc.local:31333/api"
+
+              [redis]
+              url = "redis://localhost:6379"
+              # username = "..."   # optional
+              # password = "..."   # optional
+
+              [ccam_broker]
+              backend = "%s"
+              client_id = "vehicle-detection-poc"
+              host = "es-broker.av.it.pt"
+              port = 8090
+              transport = "tcp"
+              ws_path = "/WS"
+              # username = "..."           # optional
+              # password = "..."           # optional
+              topic_base_path = "its_center/inqueue/json"
+              station_id = 141414
+              validity_duration = 120  # seconds
+
+  destination:
+    server: https://kubernetes.default.svc
+    namespace: poc
+  syncPolicy:
+    automated:
+      prune: true
+      selfHeal: true
+    syncOptions:
+      - CreateNamespace=true

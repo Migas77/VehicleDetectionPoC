@@ -67,3 +67,19 @@ Name of the config secret
 {{- define "app.configSecretName" -}}
 {{- printf "%s-config" (include "app.fullname" .) }}
 {{- end }}
+{{/*
+Name of the CAPIF secret
+*/}}
+{{- define "app.capifSecretName" -}}
+{{- printf "%s-capif" (include "app.fullname" .) }}
+{{- end }}
+
+{{/*
+Whether the PoC runs as a CAPIF API invoker. Read straight out of
+config.configToml's [net_apis] auth_mode - there is no separate capif.enabled
+switch, so the CAPIF resources (certs volume, hostAlias, CAPIF_SDK__* env) and
+the auth mode the app actually runs in can never disagree.
+*/}}
+{{- define "app.capifEnabled" -}}
+{{- regexMatch "(?m)^[[:space:]]*auth_mode[[:space:]]*=[[:space:]]*\"capif\"" (.Values.config.configToml | default "") }}
+{{- end }}

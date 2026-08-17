@@ -1,9 +1,12 @@
 import logging
+from functools import cached_property
 from typing import Any, Optional
 
+import httpx
 from pydantic import TypeAdapter
 
 from app.drivers.utilities import rate_to_bps
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.qos_profiles import QoSProfilesInterface
 from app.schemas.camara.qos_profiles import (
     QosProfile as CamaraQosProfile,
@@ -22,14 +25,20 @@ _ProfileListAdapter: TypeAdapter[list[dict[str, Any]]] = TypeAdapter(
 class CamaraQoSProfilesBackend(QoSProfilesInterface):
     """Verifies a QoS profile exists in the CAMARA gateway and its bitrates match the expected QosProfile."""
 
-    def __init__(self) -> None:
-        self._client = settings.create_camara_client()
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     async def get_qos_profiles(
         self, ue: Optional[UeWithQoS] = None
     ) -> list[dict[str, Any]]:
         res = await self._client.post(
-            "/qos-profiles/v1/retrieve-qos-profiles",
+            discover_camara_url(
+                fallback="/qos-profiles/v1/retrieve-qos-profiles",
+                resource_name="Retrieve Qos Profiles",
+                api_name_filter="qos-profiles",
+                operation="POST",
+            ),
             content=QosProfileDeviceRequest(
                 name=ue.qos_profile.qos_profile_name
                 if ue and ue.qos_profile.qos_profile_name
@@ -46,7 +55,14 @@ class CamaraQoSProfilesBackend(QoSProfilesInterface):
     async def verify_qos_profile(self, ue: UeWithQoS) -> bool:
         name = ue.qos_profile.qos_profile_name
         LOG.info("Verifying CAMARA QoS profile '%s' for UE supi=%s", name, ue.supi)
-        res = await self._client.get(f"/qos-profiles/v1/qos-profiles/{name}")
+        res = await self._client.get(
+            discover_camara_url(
+                fallback="/qos-profiles/v1/qos-profiles/{name}",
+                resource_name="Retrieve Qos Profile By Name",
+                api_name_filter="qos-profiles",
+                operation="GET",
+            ).format(name=name)
+        )
         if res.status_code == 404:
             LOG.warning("CAMARA QoS profile '%s' not found", name)
             return False

@@ -1,6 +1,9 @@
+import json
 import logging
 import math
+import ssl
 from functools import lru_cache
+from pathlib import Path
 from typing import Annotated, Literal
 
 import httpx
@@ -9,6 +12,7 @@ from pydantic import (
     AnyHttpUrl,
     BaseModel,
     Field,
+    PositiveInt,
     RedisDsn,
     field_validator,
     model_validator,
@@ -21,6 +25,11 @@ from pydantic_settings import (
     TomlConfigSettingsSource,
 )
 
+from app.capif import (
+    CAMARA_CAPIF_API_NAME,
+    CAPIF_SDK_CONFIG_PATH,
+    NEF_CAPIF_API_NAME,
+)
 from app.schemas.camara.common import Point
 from app.schemas.qos_profile import QosProfile
 
@@ -46,8 +55,35 @@ class CamaraSettings(BaseModel):
 
 
 class CapifSdkSettings(BaseModel):
+    capif_host: str = "capifcore"
+    register_host: str = "capifcore"
+    capif_https_port: PositiveInt = 443
+    capif_register_port: PositiveInt = 8084
+    debug_mode: bool = True
     capif_username: str
     capif_password: str
+    capif_callback_url: str = "http://your-callback-host/callback/"
+    cleanup_on_shutdown: bool = False
+
+    @model_validator(mode="after")
+    def fill_json_opencapif_sdk_config(self) -> "CapifSdkSettings":
+        """Push the deployment settings into the config file the OpenCAPIF SDK reads."""
+        config_path = Path(CAPIF_SDK_CONFIG_PATH)
+        config = json.loads(config_path.read_text())
+        config.update(
+            {
+                "capif_host": self.capif_host,
+                "register_host": self.register_host,
+                "capif_https_port": str(self.capif_https_port),
+                "capif_register_port": str(self.capif_register_port),
+                "debug_mode": str(self.debug_mode),
+                "capif_username": self.capif_username,
+                "capif_password": self.capif_password,
+            }
+        )
+        config["invoker"]["capif_callback_url"] = self.capif_callback_url
+        config_path.write_text(json.dumps(config, indent=4))
+        return self
 
 
 class SurveyedAreaConfig(BaseModel):
@@ -218,7 +254,7 @@ class Settings(BaseSettings):
     model_config = SettingsConfigDict(
         toml_file=["config.toml", "cameras.toml"],
         env_file=".env",
-        env_nested_delimiter="__"
+        env_nested_delimiter="__",
     )
 
     poc_title: str
@@ -247,15 +283,14 @@ class Settings(BaseSettings):
         if api == "camara" and self.camara is None:
             raise ValueError("[camara] section required when net_apis.api = 'camara'")
 
-        if api == "nef":
-            if self.nef is None:
-                raise ValueError("[nef] section required when net_apis.api = 'nef'")
-            if auth_mode == "other" and (
-                not self.nef.username or not self.nef.password
-            ):
-                raise ValueError(
-                    "nef.username and nef.password required when net_apis.auth_mode = 'other'"
-                )
+        if self.nef is None:
+            raise ValueError("[nef] section required")
+
+        # Required in both auth modes and for both APIs: the NEF management APIs
+        # (/api/v1/...) are not published to CAPIF, so the PoC always calls them
+        # (UEs, movement, QoS characteristics) with the NEF login
+        if not self.nef.username or not self.nef.password:
+            raise ValueError("nef.username and nef.password required")
 
         if auth_mode == "capif" and self.capif_sdk is None:
             raise ValueError(
@@ -264,32 +299,75 @@ class Settings(BaseSettings):
 
         return self
 
-    def create_nef_client(self) -> httpx.AsyncClient:
-        """Return a plain AsyncClient for the NEF (no auth)."""
-        return httpx.AsyncClient(base_url=str(self.nef.url).rstrip("/"))
+    def _get_ssl_context(self) -> ssl.SSLContext | bool:
+        """Build the mTLS context the AEFs (NEF / gateway nginx) require from CAPIF invokers."""
+        if self.net_apis.auth_mode != "capif":
+            return False
+
+        from app.capif.invoker import capif_invoker  # deferred — avoids circular import
+
+        if capif_invoker.invoker is None:
+            raise RuntimeError(
+                "CAPIF invoker is not initialized: its certificates are only available "
+                "after onboarding (capif_invoker.startup())"
+            )
+
+        ssl_context = ssl.create_default_context(cafile=capif_invoker.invoker.pathca)
+        ssl_context.load_cert_chain(
+            certfile=capif_invoker.invoker.signed_key_crt_path,
+            keyfile=capif_invoker.invoker.private_key_path,
+        )
+        # The AEF certificate is issued for its CAPIF-internal hostname, which is not
+        # the address the invoker reaches it on (discovery hands back an IP/fqdn)
+        ssl_context.check_hostname = False
+        return ssl_context
 
     def create_nef_auth_client(self) -> httpx.AsyncClient:
-        """Return an AsyncClient for the NEF with JWT bearer auth.
+        """Return an AsyncClient for the NEF management APIs (/api/v1/...) with JWT bearer auth.
 
-        Settings validator guarantees username/password are set when auth_mode='other'.
+        These are NOT published to CAPIF (the NEF only publishes its northbound
+        3gpp-* APIs), so they keep using the NEF login even in capif auth_mode —
+        only the mTLS client certificate is added there, as the NEF's nginx
+        requires one from every caller.
+
+        Settings validator guarantees username/password are set.
         """
         from app.drivers.nef_auth import NEFJwtAuth  # deferred — avoids circular import
 
         nef_url = str(self.nef.url).rstrip("/")
-        if self.net_apis.auth_mode == "other":
-            auth: httpx.Auth = NEFJwtAuth(
-                nef_url,
-                self.nef.username,  # type: ignore[arg-type]  # guaranteed by validator
-                self.nef.password,  # type: ignore[arg-type]
-            )
-        else:
-            raise NotImplementedError(
-                f"NEF auth_mode '{self.net_apis.auth_mode}' is not yet implemented"
-            )
-        return httpx.AsyncClient(base_url=nef_url, auth=auth)
+        auth: httpx.Auth = NEFJwtAuth(
+            nef_url,
+            self.nef.username,  # type: ignore[arg-type]  # guaranteed by validator
+            self.nef.password,  # type: ignore[arg-type]
+        )
+        return httpx.AsyncClient(
+            base_url=nef_url, auth=auth, verify=self._get_ssl_context()
+        )
+
+    def create_nef_exposure_client(self) -> httpx.AsyncClient:
+        """Return an AsyncClient for the NEF northbound APIs (/nef/api/v1/3gpp-...).
+
+        In capif auth_mode these are invoked as a CAPIF API invoker: the AEF endpoint
+        comes from service discovery and the requests carry the CAPIF access token,
+        instead of the configured url and the NEF login.
+        """
+        if self.net_apis.auth_mode != "capif":
+            return self.create_nef_auth_client()
+
+        from app.capif.invoker import capif_invoker  # deferred — avoids circular import
+        from app.drivers.capif_auth import CAPIFAuth
+
+        return httpx.AsyncClient(
+            base_url=capif_invoker.get_base_url(NEF_CAPIF_API_NAME),
+            auth=CAPIFAuth(),
+            verify=self._get_ssl_context(),
+        )
 
     def create_camara_client(self) -> httpx.AsyncClient:
         """Return an AsyncClient for the CAMARA gateway.
+
+        In capif auth_mode the gateway protects its CAMARA APIs with CAPIF, so the
+        endpoint is discovered and the requests carry the CAPIF access token.
 
         Settings validator guarantees camara is not None when net_apis.api='camara'.
         """
@@ -298,7 +376,21 @@ class Settings(BaseSettings):
                 "[camara] settings required — ensure net_apis.api = 'camara' and "
                 "[camara] section is present in config.toml"
             )
-        return httpx.AsyncClient(base_url=str(self.camara.url).rstrip("/"))
+
+        if self.net_apis.auth_mode != "capif":
+            return httpx.AsyncClient(
+                base_url=str(self.camara.url).rstrip("/"),
+                verify=self._get_ssl_context(),
+            )
+
+        from app.capif.invoker import capif_invoker  # deferred — avoids circular import
+        from app.drivers.capif_auth import CAPIFAuth
+
+        return httpx.AsyncClient(
+            base_url=capif_invoker.get_base_url(CAMARA_CAPIF_API_NAME),
+            auth=CAPIFAuth(),
+            verify=self._get_ssl_context(),
+        )
 
     @property
     def camara_notification_url(self) -> str:

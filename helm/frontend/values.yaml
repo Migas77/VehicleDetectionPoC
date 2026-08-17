@@ -117,6 +117,3 @@ tolerations: []
 
 affinity: {}
 
-env:
-  - name: BACKEND_URL
-    value: "http://crash-detection-poc.local/api"

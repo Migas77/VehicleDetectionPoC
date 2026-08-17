@@ -1,5 +1,8 @@
 import logging
+from functools import cached_property
 from typing import Any, Optional
+
+import httpx
 
 from pydantic import TypeAdapter
 
@@ -18,8 +21,9 @@ _ProfileListAdapter: TypeAdapter[list[dict[str, Any]]] = TypeAdapter(
 class NefQoSProfilesBackend(QoSProfilesInterface):
     """Verifies a QoS profile exists in the NEF and if announced bitrates match the expected QosProfile."""
 
-    def __init__(self) -> None:
-        self._client = settings.create_nef_client()
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_nef_auth_client()
 
     async def get_qos_profiles(
         self, ue: Optional[UeWithQoS] = None

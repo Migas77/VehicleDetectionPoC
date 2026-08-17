@@ -122,6 +122,44 @@ tolerations: []
 
 affinity: {}
 
+# CAPIF integration. There is no on/off switch here: everything below is only
+# rendered when config.configToml sets [net_apis] auth_mode = "capif", which is
+# what makes the PoC onboard as a CAPIF API invoker (service discovery, invoker
+# token, mTLS client certificate) in the first place.
+capif:
+  # Offboard the invoker from CAPIF core on pod shutdown (SIGTERM), e.g. on
+  # helm uninstall/rollout - so CAPIF core doesn't accumulate stale invokers.
+  cleanupOnShutdown: true
+  # The onboarding certificates are written under invoker/<capif.username>/ at
+  # runtime and shared via this hostPath, so the pod MUST land on the same node
+  # across restarts (pin it with nodeSelector on a single-node/dev cluster).
+  hostPath: /mnt/crash-detection-poc-capif-certs
+  # capif.host MUST stay the hostname CAPIF's nginx serves its cert for
+  # (CAPIF_HOSTNAME in capif/helm/scripts/variables.sh): the SDK verifies every
+  # call after onboarding against the downloaded ca.crt, which checks this
+  # hostname against the cert SAN - a *.svc.cluster.local name fails there.
+  # Nothing resolves that name, so it is mapped to an address via the pod's
+  # hostAliases - see ingressIP.
+  host: capif.testbed.develop
+  # registerHost needs no alias: the SDK reaches register on its ClusterIP
+  # service port (8084, not via the ingress) and calls getauth with
+  # verify=False, so plain cluster DNS is enough here.
+  registerHost: register.ocf-capif.svc.cluster.local
+  # Address capif.host resolves to, injected as a hostAlias on the PoC pod. Use
+  # the ingress-nginx controller ClusterIP - it lives outside the ocf-capif
+  # namespace and so survives CAPIF reinstalls:
+  #   kubectl get svc -A | awk '/ingress-nginx-controller/ {print $4; exit}'
+  # Left empty the hostAliases block is omitted entirely and onboarding fails
+  # with "Name or service not known".
+  ingressIP: ""
+  httpsPort: "443"
+  registerPort: "8084"
+  # Must match an account created by capif/helm/scripts/06_create_capif_users.sh
+  # (CAPIF_APP_USERS in capif/helm/scripts/variables.sh)
+  username: poc-invoker
+  # password should be overridden with --set capif.password=... or a values override file, not committed here
+  password: password
+
 config:
   camerasToml: ""
   configToml: ""

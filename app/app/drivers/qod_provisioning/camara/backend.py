@@ -1,9 +1,12 @@
 import logging
+from functools import cached_property
 from ipaddress import IPv4Address
 from typing import Any
 
+import httpx
 from pydantic import TypeAdapter
 
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.qod_provisioning import QoDProvisioningInterface
 from app.schemas.camara.device import Device, DeviceIpv4Addr
 from app.schemas.camara.qodProvisioning import (
@@ -24,8 +27,11 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
     """Creates and manages an indefinite QoD provisioning in the CAMARA gateway for a camera UE."""
 
     def __init__(self) -> None:
-        self._client = settings.create_camara_client()
         self._notification_url = settings.camara_notification_url
+
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     @staticmethod
     def _build_device(ue: UE) -> Device:
@@ -58,7 +64,12 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
             ue.qos_profile.qos_profile_name,
         )
         res = await self._client.post(
-            "/qod-provisioning/v0.2/device-qos",
+            discover_camara_url(
+                fallback="/qod-provisioning/v0.2/device-qos",
+                resource_name="Create Provisioning",
+                api_name_filter="qod-provisioning",
+                operation="POST",
+            ),
             content=payload.model_dump_json(exclude_unset=True),
             headers={"Content-Type": "application/json"},
         )
@@ -76,7 +87,12 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
 
     async def get_qod_provisioning(self, provisioning_id: str) -> dict[str, Any]:
         res = await self._client.get(
-            f"/qod-provisioning/v0.2/device-qos/{provisioning_id}"
+            discover_camara_url(
+                fallback="/qod-provisioning/v0.2/device-qos/{provisioningId}",
+                resource_name="Get Qod Information By Id",
+                api_name_filter="qod-provisioning",
+                operation="GET",
+            ).format(provisioningId=provisioning_id)
         )
         if not res.is_success:
             raise RuntimeError(
@@ -87,7 +103,12 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
     async def delete_qod_provisioning(self, provisioning_id: str) -> bool:
         LOG.info("Deleting CAMARA QoD provisioning id=%s", provisioning_id)
         res = await self._client.delete(
-            f"/qod-provisioning/v0.2/device-qos/{provisioning_id}"
+            discover_camara_url(
+                fallback="/qod-provisioning/v0.2/device-qos/{provisioningId}",
+                resource_name="Delete Qod",
+                api_name_filter="qod-provisioning",
+                operation="DELETE",
+            ).format(provisioningId=provisioning_id)
         )
         if res.status_code == 404:
             LOG.warning(
@@ -104,7 +125,12 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
     async def retrieve_qod_provisioning_by_device(self, ue: UE) -> str | None:
         payload = RetrieveProvisioningByDevice(device=self._build_device(ue))
         res = await self._client.post(
-            "/qod-provisioning/v0.2/retrieve-device-qos",
+            discover_camara_url(
+                fallback="/qod-provisioning/v0.2/retrieve-device-qos",
+                resource_name="Get Qod Information By Id",
+                api_name_filter="qod-provisioning",
+                operation="POST",
+            ),
             content=payload.model_dump_json(exclude_unset=True),
             headers={"Content-Type": "application/json"},
         )

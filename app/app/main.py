@@ -7,6 +7,7 @@ from typing import cast, Iterable
 from fastapi import FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
+from app.capif.invoker import capif_invoker
 from app.drivers import router as drivers_router
 from app.drivers.analytics import AnalyticsInterfaceDep
 from app.drivers.application_profiles import ApplicationProfilesInterfaceDep
@@ -216,13 +217,36 @@ async def _stop_moving_ues(
         await ues_interface.stop_movement(ue.supi)
 
 
+# Remove OpenCAPIF SDK logging file handlers from root
+root_logger = logging.getLogger()
+root_logger.handlers = [
+    h
+    for h in root_logger.handlers
+    if not (
+        isinstance(h, logging.FileHandler)
+        and h.baseFilename.endswith(("sdk_logs.log", "builder_logs.log"))
+    )
+]
+
+
 @asynccontextmanager
 async def lifespan(_app: FastAPI) -> AsyncGenerator[None, None]:
+    if settings.net_apis.auth_mode == "capif":
+        capif_invoker.startup()
+
     if settings.ccam_broker.backend == "mqtt":
         async with mqtt_lifespan():
             yield
     else:
         yield
+
+    # settings validator guarantees capif_sdk is set when auth_mode = "capif"
+    if (
+        settings.net_apis.auth_mode == "capif"
+        and settings.capif_sdk is not None
+        and settings.capif_sdk.cleanup_on_shutdown
+    ):
+        capif_invoker.shutdown()
 
 
 app = FastAPI(title=settings.poc_title, lifespan=lifespan)

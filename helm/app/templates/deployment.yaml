@@ -22,7 +22,15 @@ spec:
         {{- with .Values.podLabels }}
         {{- toYaml . | nindent 8 }}
         {{- end }}
-    spec:
+    spec:      {{- if and (eq (include "app.capifEnabled" .) "true") .Values.capif.ingressIP }}
+      # capif.host is the hostname CAPIF's nginx serves its cert for, and it is
+      # not resolvable by anything (no DNS zone, not a Service name) - map it
+      # to capif.ingressIP here, as CAPIF itself does for its register pod.
+      hostAliases:
+      - ip: {{ .Values.capif.ingressIP | quote }}
+        hostnames:
+        - {{ .Values.capif.host | quote }}
+      {{- end }}
       {{- with .Values.imagePullSecrets }}
       imagePullSecrets:
         {{- toYaml . | nindent 8 }}
@@ -31,6 +39,17 @@ spec:
       {{- with .Values.podSecurityContext }}
       securityContext:
         {{- toYaml . | nindent 8 }}
+      {{- end }}
+      {{- if eq (include "app.capifEnabled" .) "true" }}
+      initContainers:
+      # Prepares the shared hostPath directory (permissions) before the PoC writes
+      # its CAPIF onboarding certificates into it at startup.
+      - name: prepare-capif-certs-dir
+        image: busybox
+        command: [ 'sh', '-c', 'mkdir -p /capif-certs && chmod -R 0777 /capif-certs' ]
+        volumeMounts:
+        - name: capif-certs
+          mountPath: /capif-certs
       {{- end }}
       containers:
         - name: {{ .Chart.Name }}
@@ -44,11 +63,31 @@ spec:
             - name: http
               containerPort: {{ .Values.service.port }}
               protocol: TCP
-          {{- with .Values.env }}
+          {{- if or .Values.env (eq (include "app.capifEnabled" .) "true") }}
           env:
-            {{- range . }}
+            {{- range .Values.env }}
             - name: {{ .name }}
               value: {{ tpl .value $ | quote }}
+            {{- end }}
+            {{- if eq (include "app.capifEnabled" .) "true" }}
+            # CAPIF invoker settings
+            - name: CAPIF_SDK__CAPIF_HOST
+              value: {{ .Values.capif.host | quote }}
+            - name: CAPIF_SDK__REGISTER_HOST
+              value: {{ .Values.capif.registerHost | quote }}
+            - name: CAPIF_SDK__CAPIF_HTTPS_PORT
+              value: {{ .Values.capif.httpsPort | quote }}
+            - name: CAPIF_SDK__CAPIF_REGISTER_PORT
+              value: {{ .Values.capif.registerPort | quote }}
+            - name: CAPIF_SDK__CAPIF_USERNAME
+              value: {{ .Values.capif.username | quote }}
+            - name: CAPIF_SDK__CAPIF_PASSWORD
+              valueFrom:
+                secretKeyRef:
+                  name: {{ include "app.capifSecretName" . }}
+                  key: CAPIF_PASSWORD
+            - name: CAPIF_SDK__CLEANUP_ON_SHUTDOWN
+              value: {{ .Values.capif.cleanupOnShutdown | quote }}
             {{- end }}
           {{- end }}
           {{- with .Values.livenessProbe }}
@@ -63,13 +102,32 @@ spec:
           resources:
             {{- toYaml . | nindent 12 }}
           {{- end }}
-          {{- with .Values.volumeMounts }}
+          {{- if or .Values.volumeMounts (eq (include "app.capifEnabled" .) "true") }}
           volumeMounts:
+            {{- with .Values.volumeMounts }}
             {{- toYaml . | nindent 12 }}
+            {{- end }}
+            {{- if eq (include "app.capifEnabled" .) "true" }}
+            # invoker_folder in app/capif/capif_sdk_config.json, relative to WORKDIR /code
+            - name: capif-certs
+              mountPath: /code/invoker
+            {{- end }}
           {{- end }}
-      {{- with .Values.volumes }}
+      {{- if or .Values.volumes (eq (include "app.capifEnabled" .) "true") }}
       volumes:
+        {{- with .Values.volumes }}
         {{- tpl (toYaml .) $ | nindent 8 }}
+        {{- end }}
+        {{- if eq (include "app.capifEnabled" .) "true" }}
+        # The PoC generates its onboarding certificates at runtime under
+        # invoker/<capif.username>/. With no shared filesystem across nodes they are
+        # kept on a hostPath - which means the pod MUST land on the same node across
+        # restarts (pin it with .Values.nodeSelector), otherwise it onboards anew.
+        - name: capif-certs
+          hostPath:
+            path: {{ .Values.capif.hostPath }}
+            type: DirectoryOrCreate
+        {{- end }}
       {{- end }}
       {{- with .Values.nodeSelector }}
       nodeSelector:

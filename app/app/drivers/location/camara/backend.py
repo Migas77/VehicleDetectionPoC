@@ -1,9 +1,12 @@
 import logging
+from functools import cached_property
 from ipaddress import IPv4Address
 from typing import Any
 
+import httpx
 from pydantic import TypeAdapter
 
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.location import LocationInterface
 from app.schemas.camara.device import Device, DeviceIpv4Addr
 from app.schemas.camara.location import (
@@ -24,8 +27,9 @@ _dict_adapter: TypeAdapter[dict[str, Any]] = TypeAdapter(dict[str, Any])
 class CamaraLocationBackend(LocationInterface):
     """Retrieves UE location via the CAMARA Location Retrieval API."""
 
-    def __init__(self) -> None:
-        self._client = settings.create_camara_client()
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     @staticmethod
     def _build_device(ue: UE) -> Device:
@@ -62,7 +66,12 @@ class CamaraLocationBackend(LocationInterface):
         payload = RetrievalLocationRequest(device=self._build_device(ue))
         LOG.info("Retrieving CAMARA location for UE supi=%s", ue.supi)
         res = await self._client.post(
-            "/location-retrieval/v0.4/retrieve",
+            discover_camara_url(
+                fallback="/location-retrieval/v0.4/retrieve",
+                resource_name="Retrieve Location",
+                api_name_filter="location-retrieval",
+                operation="POST",
+            ),
             content=payload.model_dump_json(exclude_unset=True),
             headers={"Content-Type": "application/json"},
         )

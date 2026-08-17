@@ -7,6 +7,7 @@ from uuid import uuid4
 import httpx
 from pydantic import AnyUrl
 
+from app.drivers.capif_auth import discover_nef_url
 from app.interfaces.geofencing import GeofencingInterface
 from app.schemas.camara.geofencing import SubscriptionEventType
 from app.schemas.nef.monitoringevent import (
@@ -38,7 +39,7 @@ class NefGeofencingBackend(GeofencingInterface):
 
     @cached_property
     def _client(self) -> httpx.AsyncClient:
-        return settings.create_nef_auth_client()
+        return settings.create_nef_exposure_client()
 
     async def create_geofencing_subscription(
         self, ue: UE, area: SurveyedArea
@@ -70,7 +71,12 @@ class NefGeofencingBackend(GeofencingInterface):
                 "neither msisdn nor ip_address_v4 is set"
             )
 
-        url = f"/nef/api/v1/3gpp-monitoring-event/v1/{settings.poc_af_id}/subscriptions"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-monitoring-event/v1/{scsAsId}/subscriptions",
+            resource_name="Create Subscription",
+            api_name_filter="monitoring-event",
+            operation="POST",
+        ).format(scsAsId=settings.poc_af_id)
         LOG.info(
             "Creating NEF geofencing (location) subscription for UE supi=%s, camera supi=%s",
             ue.supi,
@@ -95,7 +101,7 @@ class NefGeofencingBackend(GeofencingInterface):
             ue_supi=ue.supi,
             area=area,
             types=_GEOFENCING_EVENT_TYPES,
-            nef_subscription_url=str(subscription.self),
+            nef_subscription_id=self._extract_subscription_id(str(subscription.self)),
             last_state=None,
         )
         await self._redis.set(
@@ -120,12 +126,18 @@ class NefGeofencingBackend(GeofencingInterface):
             )
             return False
         managed = ManagedGeofencingSubscription.model_validate_json(raw)
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-monitoring-event/v1/{scsAsId}/subscriptions/{subscriptionId}",
+            resource_name="Delete Subscription",
+            api_name_filter="monitoring-event",
+            operation="DELETE",
+        ).format(scsAsId=settings.poc_af_id, subscriptionId=managed.nef_subscription_id)
         LOG.info(
-            "Deleting NEF geofencing subscription id=%s (NEF url=%s)",
+            "Deleting NEF geofencing subscription id=%s (NEF subscriptionId=%s)",
             subscription_id,
-            managed.nef_subscription_url,
+            managed.nef_subscription_id,
         )
-        res = await self._client.delete(managed.nef_subscription_url)
+        res = await self._client.delete(url)
         if res.status_code == 404:
             LOG.warning(
                 "NEF monitoring subscription for geofencing id=%s not found",
@@ -139,3 +151,8 @@ class NefGeofencingBackend(GeofencingInterface):
             )
         await self._redis.delete(key)
         return True
+
+    @staticmethod
+    def _extract_subscription_id(self_link: str) -> str:
+        """Extract the subscription ID from the last path segment of the NEF 'self' URL."""
+        return self_link.rstrip("/").split("/")[-1]

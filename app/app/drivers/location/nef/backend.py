@@ -7,6 +7,7 @@ from typing import Any
 import httpx
 from pydantic import AnyUrl, TypeAdapter
 
+from app.drivers.capif_auth import discover_nef_url
 from app.interfaces.location import LocationInterface
 from app.schemas.camara.common import Point as CamaraPoint
 from app.schemas.camara.location import Circle, Location, Polygon
@@ -30,7 +31,7 @@ class NefLocationBackend(LocationInterface):
 
     @cached_property
     def _client(self) -> httpx.AsyncClient:
-        return settings.create_nef_auth_client()
+        return settings.create_nef_exposure_client()
 
     async def retrieve_location(self, ue: UE) -> Location:
         if ue.ip_address_v4 is not None:
@@ -53,7 +54,12 @@ class NefLocationBackend(LocationInterface):
                 "neither ip_address_v4 nor msisdn is set"
             )
 
-        url = f"/nef/api/v1/3gpp-monitoring-event/v1/{settings.poc_af_id}/subscriptions"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-monitoring-event/v1/{scsAsId}/subscriptions",
+            resource_name="Create Subscription",
+            api_name_filter="monitoring-event",
+            operation="POST",
+        ).format(scsAsId=settings.poc_af_id)
         res = await self._client.post(
             url,
             content=payload.model_dump_json(exclude_unset=True),

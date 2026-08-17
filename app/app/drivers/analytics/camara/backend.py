@@ -1,5 +1,9 @@
 import logging
+from functools import cached_property
 
+import httpx
+
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.analytics import AnalyticsInterface
 from app.schemas.camara.application_profiles import ApplicationProfileId
 from app.schemas.camara.connectivity_insights_subscriptions import (
@@ -32,8 +36,11 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
 
     def __init__(self) -> None:
         super().__init__()
-        self._client = settings.create_camara_client()
         self._notification_url = settings.camara_notification_url
+
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     @staticmethod
     def _build_device(ue: UeWithQoS) -> Device:
@@ -77,7 +84,12 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
             application_profile_id,
         )
         res = await self._client.post(
-            "/connectivity-insights-subscriptions/v0.6/subscriptions",
+            discover_camara_url(
+                fallback="/connectivity-insights-subscriptions/v0.6/subscriptions",
+                resource_name="Create Subscription",
+                api_name_filter="connectivity-insights-subscriptions",
+                operation="POST",
+            ),
             content=SubscriptionRequestTypeAdapter.dump_json(
                 payload, exclude_unset=True
             ),
@@ -102,7 +114,12 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
     ) -> bool:
         LOG.info("Deleting CAMARA CIS subscription id=%s", subscription_id)
         res = await self._client.delete(
-            f"/connectivity-insights-subscriptions/v0.6/subscriptions/{subscription_id}"
+            discover_camara_url(
+                fallback="/connectivity-insights-subscriptions/v0.6/subscriptions/{subscriptionId}",
+                resource_name="Delete Subscription By Id",
+                api_name_filter="connectivity-insights-subscriptions",
+                operation="DELETE",
+            ).format(subscriptionId=subscription_id)
         )
         if res.status_code == 404:
             LOG.warning(

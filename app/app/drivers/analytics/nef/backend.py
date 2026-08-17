@@ -3,6 +3,7 @@ from functools import cached_property
 
 import httpx
 
+from app.drivers.capif_auth import discover_nef_url
 from app.interfaces.analytics import AnalyticsInterface
 from app.schemas.camara.application_profiles import ApplicationProfileId
 from app.schemas.nef.analytics_exposure import (
@@ -30,7 +31,7 @@ class NefAnalyticsBackend(AnalyticsInterface):
 
     @cached_property
     def _client(self) -> httpx.AsyncClient:
-        return settings.create_nef_auth_client()
+        return settings.create_nef_exposure_client()
 
     async def create_analytics_subscription(
         self, ue: UeWithQoS, application_profile_id: ApplicationProfileId
@@ -78,9 +79,12 @@ class NefAnalyticsBackend(AnalyticsInterface):
                 application_profile_id
             ),  # round-trips in callback for correlation
         )
-        url = (
-            f"/nef/api/v1/3gpp-analyticsexposure/v1/{settings.poc_af_id}/subscriptions"
-        )
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-analyticsexposure/v1/{afId}/subscriptions",
+            resource_name="Create Subscription",
+            api_name_filter="analyticsexposure",
+            operation="POST",
+        ).format(afId=settings.poc_af_id)
         LOG.info(
             "Creating NEF analytics subscription for UE supi=%s, applicationProfileId=%s",
             ue.supi,
@@ -113,10 +117,12 @@ class NefAnalyticsBackend(AnalyticsInterface):
         self, ue: UeWithQoS, subscription_id: str
     ) -> bool:
         LOG.info("Deleting NEF analytics subscription id=%s", subscription_id)
-        url = (
-            f"/nef/api/v1/3gpp-analyticsexposure/v1/"
-            f"{settings.poc_af_id}/subscriptions/{subscription_id}"
-        )
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-analyticsexposure/v1/{afId}/subscriptions/{subscriptionId}",
+            resource_name="Delete Subscription",
+            api_name_filter="analyticsexposure",
+            operation="DELETE",
+        ).format(afId=settings.poc_af_id, subscriptionId=subscription_id)
         res = await self._client.delete(url)
         if res.status_code == 404:
             LOG.warning(

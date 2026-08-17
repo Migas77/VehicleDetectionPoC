@@ -9,6 +9,7 @@ dependencies = [
     "fastapi[standard]>=0.137.1",
     "geopy>=2.4.1",
     "httpx>=0.28.1",
+    "opencapif-sdk>=0.1.24",
     "pydantic>=2.13.4",
     "pydantic-settings>=2.14.1",
     "redis[hiredis]>=8.0.0",
@@ -27,7 +28,7 @@ strict = true
 plugins = ['pydantic.mypy']
 
 [[tool.mypy.overrides]]
-module = ["geopy", "geopy.distance", "geopy.geocoders", "shapely"]
+module = ["geopy", "geopy.distance", "geopy.geocoders", "shapely", "opencapif_sdk"]
 ignore_missing_imports = true
 
 [tool.ruff.lint]

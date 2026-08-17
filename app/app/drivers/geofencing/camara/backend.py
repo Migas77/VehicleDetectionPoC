@@ -1,6 +1,10 @@
 import logging
+from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
 
+import httpx
+
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.geofencing import GeofencingInterface
 from app.schemas.camara.device import Device, DeviceIpv4Addr
 from app.schemas.camara.geofencing import (
@@ -38,8 +42,11 @@ class CamaraGeofencingBackend(GeofencingInterface):
 
     def __init__(self) -> None:
         super().__init__()
-        self._client = settings.create_camara_client()
         self._notification_url = settings.camara_notification_url
+
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     @staticmethod
     def _build_device(ue: UE) -> Device:
@@ -90,7 +97,12 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 event_type.value,
             )
             res = await self._client.post(
-                "/geofencing-subscriptions/v0.4/subscriptions",
+                discover_camara_url(
+                    fallback="/geofencing-subscriptions/v0.4/subscriptions",
+                    resource_name="Post Subscriptions",
+                    api_name_filter="geofencing-subscriptions",
+                    operation="POST",
+                ),
                 content=payload.model_dump_json(exclude_unset=True),
                 headers={"Content-Type": "application/json"},
             )
@@ -114,7 +126,12 @@ class CamaraGeofencingBackend(GeofencingInterface):
     ) -> bool:
         LOG.info("Deleting CAMARA geofencing subscription id=%s", subscription_id)
         res = await self._client.delete(
-            f"/geofencing-subscriptions/v0.4/subscriptions/{subscription_id}"
+            discover_camara_url(
+                fallback="/geofencing-subscriptions/v0.4/subscriptions/{subscriptionId}",
+                resource_name="Delete Subscriptions By Id",
+                api_name_filter="geofencing-subscriptions",
+                operation="DELETE",
+            ).format(subscriptionId=subscription_id)
         )
         if res.status_code == 404:
             LOG.warning(

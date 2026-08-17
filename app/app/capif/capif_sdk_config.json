@@ -1,0 +1,60 @@
+{
+    "capif_host": "capifcore",
+    "register_host": "capifcore",
+    "capif_https_port": "443",
+    "capif_register_port": "8084",
+    "capif_username": "poc-invoker",
+    "capif_password": "password",
+    "debug_mode": "True",
+    "invoker": {
+        "invoker_folder": "invoker",
+        "capif_callback_url": "http://localhost:8080/callback/",
+        "supported_features": "",
+        "check_authentication_data": {
+            "ip": "",
+            "port": ""
+        },
+        "cert_generation": {
+            "csr_common_name": "crash-detection-poc-invoker",
+            "csr_organizational_unit": "crash-detection-poc",
+            "csr_organization": "IT-Aveiro",
+            "csr_locality": "Aveiro",
+            "csr_state_or_province_name": "Aveiro",
+            "csr_country_name": "PT",
+            "csr_email_address": "poc-invoker@example.com"
+        },
+        "discover_filter": {
+            "api-name": "",
+            "api-version": "",
+            "comm-type": "",
+            "protocol": "",
+            "aef-id": "",
+            "data-format": "",
+            "api-cat": "",
+            "preferred-aef-loc": "",
+            "req-api-prov-name": "",
+            "supported-features": "",
+            "api-supported-features": "",
+            "ue-ip-addr": "",
+            "service-kpis": ""
+        },
+        "events": {
+            "description": [
+                ""
+            ],
+            "eventFilters": [
+                {
+                    "apiIds": [
+                        ""
+                    ],
+                    "apiInvokerIds": [
+                        ""
+                    ],
+                    "aefIds": [
+                        ""
+                    ]
+                }
+            ]
+        }
+    }
+}

@@ -1,0 +1,12 @@
+dependencies:
+- name: crash-detection-poc-frontend
+  repository: file://../frontend
+  version: 0.0.1
+- name: crash-detection-poc-app
+  repository: file://../app
+  version: 0.0.1
+- name: redis
+  repository: oci://registry-1.docker.io/bitnamicharts
+  version: 25.3.9
+digest: sha256:ae6947a444c4c8861adb11aa686fbad93cdff1eac91296b4593b0036e50dfeb6
+generated: "2026-08-15T16:16:10.603502068+01:00"

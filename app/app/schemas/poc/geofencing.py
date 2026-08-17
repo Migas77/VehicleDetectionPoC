@@ -22,5 +22,5 @@ class ManagedGeofencingSubscription(BaseModel):
     ue_supi: str
     area: SurveyedArea
     types: list[SubscriptionEventType]  # [v0_area_entered, v0_area_left]
-    nef_subscription_url: str  # NEF monitoring 'self' link, for deletion
+    nef_subscription_id: str  # NEF monitoring subscription id, for deletion
     last_state: GeofenceState | None = None

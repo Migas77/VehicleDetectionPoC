@@ -6,6 +6,7 @@ from typing import Any
 import httpx
 from pydantic import TypeAdapter
 
+from app.drivers.capif_auth import discover_nef_url
 from app.interfaces.qod_provisioning import QoDProvisioningInterface
 from app.schemas.nef.afSessionWithQos import AsSessionWithQoSSubscription
 from app.schemas.poc import UE
@@ -25,7 +26,7 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
 
     @cached_property
     def _client(self) -> httpx.AsyncClient:
-        return settings.create_nef_auth_client()
+        return settings.create_nef_exposure_client()
 
     async def assign_qos_profile(self, ue: UeWithQoS) -> str:
         notification_dest = (
@@ -53,7 +54,12 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
                 "neither ip_address_v4 nor msisdn is set"
             )
 
-        url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-as-session-with-qos/v1/{scsAsId}/subscriptions",
+            resource_name="Create Subscription",
+            api_name_filter="as-session-with-qos",
+            operation="POST",
+        ).format(scsAsId=settings.poc_af_id)
         LOG.info(
             "Creating NEF AsSessionWithQoS subscription for UE supi=%s, qosRef=%s",
             ue.supi,
@@ -82,7 +88,12 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
         return sub_id
 
     async def get_qod_provisioning(self, provisioning_id: str) -> dict[str, Any]:
-        url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions/{provisioning_id}"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-as-session-with-qos/v1/{scsAsId}/subscriptions/{subscriptionId}",
+            resource_name="Read Subscription",
+            api_name_filter="as-session-with-qos",
+            operation="GET",
+        ).format(scsAsId=settings.poc_af_id, subscriptionId=provisioning_id)
         res = await self._client.get(url)
         if not res.is_success:
             raise RuntimeError(
@@ -92,7 +103,12 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
 
     async def delete_qod_provisioning(self, provisioning_id: str) -> bool:
         LOG.info("Deleting NEF AsSessionWithQoS subscription id=%s", provisioning_id)
-        url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions/{provisioning_id}"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-as-session-with-qos/v1/{scsAsId}/subscriptions/{subscriptionId}",
+            resource_name="Delete Subscription",
+            api_name_filter="as-session-with-qos",
+            operation="DELETE",
+        ).format(scsAsId=settings.poc_af_id, subscriptionId=provisioning_id)
         res = await self._client.delete(url)
         if res.status_code == 404:
             LOG.warning(
@@ -108,7 +124,12 @@ class NefQoDProvisioningBackend(QoDProvisioningInterface):
         return True
 
     async def retrieve_qod_provisioning_by_device(self, ue: UE) -> str | None:
-        url = f"/nef/api/v1/3gpp-as-session-with-qos/v1/{settings.poc_af_id}/subscriptions"
+        url = discover_nef_url(
+            fallback="/nef/api/v1/3gpp-as-session-with-qos/v1/{scsAsId}/subscriptions",
+            resource_name="Read Active Subscriptions",
+            api_name_filter="as-session-with-qos",
+            operation="GET",
+        ).format(scsAsId=settings.poc_af_id)
         res = await self._client.get(url)
         if not res.is_success:
             raise RuntimeError(

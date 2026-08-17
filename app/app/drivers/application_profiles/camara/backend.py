@@ -1,6 +1,10 @@
 import logging
+from functools import cached_property
+
+import httpx
 
 from app.drivers.utilities import bitrate_str_to_rate
+from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.application_profiles import ApplicationProfilesInterface
 from app.schemas.camara.application_profiles import (
     ApplicationProfile,
@@ -17,8 +21,9 @@ LOG = logging.getLogger(__name__)
 class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
     """Creates and retrieves ApplicationProfiles via the CAMARA Application Profiles API."""
 
-    def __init__(self) -> None:
-        self._client = settings.create_camara_client()
+    @cached_property
+    def _client(self) -> httpx.AsyncClient:
+        return settings.create_camara_client()
 
     async def create_application_profile(self, ue: UeWithQoS) -> ApplicationProfile:
         payload = ApplicationProfileRequest(
@@ -33,7 +38,12 @@ class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
         )
         LOG.info("Creating CAMARA ApplicationProfile for UE supi=%s", ue.supi)
         res = await self._client.post(
-            "/application-profiles/v0.5/application-profiles",
+            discover_camara_url(
+                fallback="/application-profiles/v0.5/application-profiles",
+                resource_name="Create Application Profile",
+                api_name_filter="application-profiles",
+                operation="POST",
+            ),
             content=payload.model_dump_json(exclude_unset=True),
             headers={"Content-Type": "application/json"},
         )
@@ -59,7 +69,12 @@ class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
                 f"CAMARA ApplicationProfile get requires application_profile_id for UE supi={ue_supi}"
             )
         res = await self._client.get(
-            f"/application-profiles/v0.5/application-profiles/{application_profile_id}"
+            discover_camara_url(
+                fallback="/application-profiles/v0.5/application-profiles/{applicationProfileId}",
+                resource_name="Get Application Profile By Id",
+                api_name_filter="application-profiles",
+                operation="GET",
+            ).format(applicationProfileId=application_profile_id)
         )
         if not res.is_success:
             raise RuntimeError(
@@ -72,7 +87,12 @@ class CamaraApplicationProfilesBackend(ApplicationProfilesInterface):
     ) -> bool:
         LOG.info("Deleting CAMARA ApplicationProfile id=%s", application_profile_id)
         res = await self._client.delete(
-            f"/application-profiles/v0.5/application-profiles/{application_profile_id}"
+            discover_camara_url(
+                fallback="/application-profiles/v0.5/application-profiles/{applicationProfileId}",
+                resource_name="Delete Application Profile By Id",
+                api_name_filter="application-profiles",
+                operation="DELETE",
+            ).format(applicationProfileId=application_profile_id)
         )
         if res.status_code == 404:
             LOG.warning(
