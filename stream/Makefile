@@ -13,7 +13,7 @@ STREAM_PATH ?= mystream
 VIDEOS_DRIVE_FOLDER_ID ?= 1jlTpVB6yf7tMdf_Hgwt2fT39tTRdYnyI
 VIDEOS_DIR ?= videos
 
-.PHONY: init-env check-ip video-download mediamtx-up mediamtx-down stream-publish stream-play help
+.PHONY: init-env check-ip video-download video-info mediamtx-up mediamtx-down stream-publish stream-play help
 
 init-env: ## Copy .env.example to .env (won't overwrite existing)
 	@if [ -f .env ]; then \
@@ -46,6 +46,14 @@ video-download: ## Download every file of the videos Google Drive folder into VI
 			fi; \
 		done
 
+video-info: ## Show resolution and frame rate (r_frame_rate,avg_frame_rate) of every video in VIDEOS_DIR
+	@printf "%-6s\t%-6s\t%-11s\t%-11s\t%s\n" WIDTH HEIGHT R_FPS AVG_FPS FILE; \
+	for f in "$(VIDEOS_DIR)"/*.mkv "$(VIDEOS_DIR)"/*.mp4; do \
+		[ -f "$$f" ] || continue; \
+		ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,avg_frame_rate -of csv=p=0 "$$f" \
+			| { IFS=, read -r w h r a; printf "%-6s\t%-6s\t%-11s\t%-11s\t%s\n" "$$w" "$$h" "$$r" "$$a" "$$f"; }; \
+	done
+
 mediamtx-up: check-ip ## Run the MediaMTX streaming server via Docker
 	# ---- Port map ----
 	# 8554       RTSP (TCP)
@@ -55,16 +63,22 @@ mediamtx-up: check-ip ## Run the MediaMTX streaming server via Docker
 	# 8890/udp   SRT             [not exposed]
 	# 8189/udp   WebRTC ICE/UDP
 	# -------------------
-	sudo docker run -d --name mediamtx \
-		-e MTX_RTSPTRANSPORTS=tcp \
-		-e MTX_WEBRTCADDITIONALHOSTS=$(MTX_WEBRTCADDITIONALHOSTS) \
-		-p 8554:8554 \
-		-p 8889:8889 \
-		-p 8189:8189/udp \
-		bluenviron/mediamtx:1
+	# If a container named mediamtx already exists, start it instead of creating a new one
+	@if sudo docker container inspect mediamtx >/dev/null 2>&1; then \
+		echo "Container mediamtx already exists, starting it"; \
+		sudo docker start mediamtx; \
+	else \
+		sudo docker run -d --name mediamtx \
+			-e MTX_RTSPTRANSPORTS=tcp \
+			-e MTX_WEBRTCADDITIONALHOSTS=$(MTX_WEBRTCADDITIONALHOSTS) \
+			-p 8554:8554 \
+			-p 8889:8889 \
+			-p 8189:8189/udp \
+			bluenviron/mediamtx:1; \
+	fi
 
 mediamtx-down: ## Stop and remove the MediaMTX container
-	docker rm -f mediamtx
+	sudo docker rm -f mediamtx
 
 stream-publish: check-ip ## [sender] Loop VIDEO as an RTSP stream to rtsp://MEDIAMTX_IP:8554/STREAM_PATH
 	@if [ ! -f "$(VIDEO)" ]; then \
