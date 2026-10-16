@@ -1,0 +1,231 @@
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ifconfig | grep 192
+        inet 192.168.93.25  netmask 255.255.255.0  broadcast 192.168.93.255
+        TX packets 192  bytes 20315 (20.3 KB)
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ifconfig | grep 192
+        inet 192.168.93.25  netmask 255.255.255.0  broadcast 192.168.93.255
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ip r
+default dev wwan0 scope link 
+default via 192.168.93.1 dev enx00e04c534458 proto dhcp metric 100 
+10.16.9.28/30 dev wwan0 proto kernel scope link src 10.16.9.29 
+10.42.0.0/24 dev cni0 proto kernel scope link src 10.42.0.1 
+169.254.0.0/16 dev br-38987688ce91 scope link metric 1000 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-38987688ce91 proto kernel scope link src 172.18.0.1 
+192.168.93.0/24 dev enx00e04c534458 proto kernel scope link src 192.168.93.25 metric 100 
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ip r d default den wwan0
+Error: either "to" is duplicate, or "den" is a garbage.
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ip r d default dev wwan0
+RTNETLINK answers: Operation not permitted
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ sudo ip r d default dev wwan0
+[sudo] password for atnog: 
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ifconfig
+br-38987688ce91: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 172.18.0.1  netmask 255.255.0.0  broadcast 172.18.255.255
+        inet6 fe80::1855:d4ff:feee:9377  prefixlen 64  scopeid 0x20<link>
+        ether 1a:55:d4:ee:93:77  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+cni0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet 10.42.0.1  netmask 255.255.255.0  broadcast 10.42.0.255
+        inet6 fe80::94e5:d3ff:feda:aff8  prefixlen 64  scopeid 0x20<link>
+        ether 96:e5:d3:da:af:f8  txqueuelen 1000  (Ethernet)
+        RX packets 50340  bytes 9744022 (9.7 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 55820  bytes 7036046 (7.0 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+docker0: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        inet 172.17.0.1  netmask 255.255.0.0  broadcast 172.17.255.255
+        ether 3a:7c:37:45:76:f6  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+eno1: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        ether 88:ae:dd:04:4a:d5  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 11  bytes 1813 (1.8 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+enx00e04c534458: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet 192.168.93.25  netmask 255.255.255.0  broadcast 192.168.93.255
+        inet6 fe80::8a72:4e00:a7f1:e742  prefixlen 64  scopeid 0x20<link>
+        ether 00:e0:4c:53:44:58  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+flannel.1: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet 10.42.0.0  netmask 255.255.255.255  broadcast 0.0.0.0
+        inet6 fe80::4811:29ff:fee3:c5  prefixlen 64  scopeid 0x20<link>
+        ether 4a:11:29:e3:00:c5  txqueuelen 0  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 69 overruns 0  carrier 0  collisions 0
+
+lo: flags=73<UP,LOOPBACK,RUNNING>  mtu 65536
+        inet 127.0.0.1  netmask 255.0.0.0
+        inet6 ::1  prefixlen 128  scopeid 0x10<host>
+        loop  txqueuelen 1000  (Local Loopback)
+        RX packets 53185  bytes 31945137 (31.9 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 53185  bytes 31945137 (31.9 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth08a7a0fc: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::f885:5bff:fe45:f24a  prefixlen 64  scopeid 0x20<link>
+        ether fa:85:5b:45:f2:4a  txqueuelen 0  (Ethernet)
+        RX packets 11457  bytes 1139454 (1.1 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 12390  bytes 1178909 (1.1 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth2b47e787: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::847c:98ff:fe1f:4f66  prefixlen 64  scopeid 0x20<link>
+        ether 86:7c:98:1f:4f:66  txqueuelen 0  (Ethernet)
+        RX packets 343  bytes 27085 (27.0 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 597  bytes 52398 (52.3 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth36b1f501: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::c045:4eff:feac:adf1  prefixlen 64  scopeid 0x20<link>
+        ether c2:45:4e:ac:ad:f1  txqueuelen 0  (Ethernet)
+        RX packets 2510  bytes 281543 (281.5 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 2550  bytes 257126 (257.1 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth3a151422: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::3c53:fdff:fef1:aa92  prefixlen 64  scopeid 0x20<link>
+        ether 3e:53:fd:f1:aa:92  txqueuelen 0  (Ethernet)
+        RX packets 24349  bytes 7593489 (7.5 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 29861  bytes 4094337 (4.0 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth453cd331: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::f45b:38ff:fe07:af7b  prefixlen 64  scopeid 0x20<link>
+        ether f6:5b:38:07:af:7b  txqueuelen 0  (Ethernet)
+        RX packets 15  bytes 1102 (1.1 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 203  bytes 16852 (16.8 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth4ca6e4b6: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::d8ad:b0ff:febc:e84a  prefixlen 64  scopeid 0x20<link>
+        ether da:ad:b0:bc:e8:4a  txqueuelen 0  (Ethernet)
+        RX packets 1748  bytes 130157 (130.1 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 3557  bytes 320757 (320.7 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth4e1b595c: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::581d:16ff:fe7b:3228  prefixlen 64  scopeid 0x20<link>
+        ether 5a:1d:16:7b:32:28  txqueuelen 0  (Ethernet)
+        RX packets 4663  bytes 468661 (468.6 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 4693  bytes 742100 (742.1 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth6e669531: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::b82c:cfff:fe22:601d  prefixlen 64  scopeid 0x20<link>
+        ether ba:2c:cf:22:60:1d  txqueuelen 0  (Ethernet)
+        RX packets 450  bytes 44922 (44.9 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 543  bytes 113358 (113.3 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth78364a4f: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::14ab:f0ff:feb6:66f6  prefixlen 64  scopeid 0x20<link>
+        ether 16:ab:f0:b6:66:f6  txqueuelen 0  (Ethernet)
+        RX packets 385  bytes 34563 (34.5 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 442  bytes 65238 (65.2 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+veth8ed6a74e: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::6838:83ff:fe90:67cf  prefixlen 64  scopeid 0x20<link>
+        ether 6a:38:83:90:67:cf  txqueuelen 0  (Ethernet)
+        RX packets 1093  bytes 90418 (90.4 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 1897  bytes 146916 (146.9 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+vethe08d3077: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::3429:12ff:fe3f:ac22  prefixlen 64  scopeid 0x20<link>
+        ether 36:29:12:3f:ac:22  txqueuelen 0  (Ethernet)
+        RX packets 2894  bytes 277485 (277.4 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 3159  bytes 319089 (319.0 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+vethec2a70ee: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1450
+        inet6 fe80::6c41:bff:fe2f:f346  prefixlen 64  scopeid 0x20<link>
+        ether 6e:41:0b:2f:f3:46  txqueuelen 0  (Ethernet)
+        RX packets 6502  bytes 936469 (936.4 KB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 5014  bytes 559693 (559.6 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+vethfc8cfb0: flags=4163<UP,BROADCAST,RUNNING,MULTICAST>  mtu 1500
+        inet6 fe80::d468:cfff:fe6c:7199  prefixlen 64  scopeid 0x20<link>
+        ether d6:68:cf:6c:71:99  txqueuelen 0  (Ethernet)
+        RX packets 3  bytes 126 (126.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 195  bytes 20592 (20.5 KB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+wlp0s20f3: flags=4099<UP,BROADCAST,MULTICAST>  mtu 1500
+        ether 70:32:17:8f:10:51  txqueuelen 1000  (Ethernet)
+        RX packets 0  bytes 0 (0.0 B)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 0  bytes 0 (0.0 B)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+wwan0: flags=4291<UP,BROADCAST,RUNNING,NOARP,MULTICAST>  mtu 1500
+        inet 10.16.9.29  netmask 255.255.255.252  broadcast 10.16.9.31
+        inet6 fe80::404:c4ff:fe5e:b2b3  prefixlen 64  scopeid 0x20<link>
+        ether 06:04:c4:5e:b2:b3  txqueuelen 1000  (Ethernet)
+        RX packets 78762  bytes 107382142 (107.3 MB)
+        RX errors 0  dropped 0  overruns 0  frame 0
+        TX packets 39428  bytes 3478680 (3.4 MB)
+        TX errors 0  dropped 0 overruns 0  carrier 0  collisions 0
+
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ping 1.1.1.1 -I wwan0
+PING 1.1.1.1 (1.1.1.1) from 10.16.9.29 wwan0: 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=51 time=33.9 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=51 time=27.7 ms
+64 bytes from 1.1.1.1: icmp_seq=3 ttl=51 time=28.6 ms
+64 bytes from 1.1.1.1: icmp_seq=4 ttl=51 time=29.6 ms
+^C
+--- 1.1.1.1 ping statistics ---
+4 packets transmitted, 4 received, 0% packet loss, time 3004ms
+rtt min/avg/max/mdev = 27.653/29.940/33.881/2.382 ms
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ping 1.1.1.1
+PING 1.1.1.1 (1.1.1.1) 56(84) bytes of data.
+64 bytes from 1.1.1.1: icmp_seq=1 ttl=54 time=19.2 ms
+64 bytes from 1.1.1.1: icmp_seq=2 ttl=54 time=19.6 ms
+64 bytes from 1.1.1.1: icmp_seq=3 ttl=54 time=19.8 ms
+64 bytes from 1.1.1.1: icmp_seq=4 ttl=54 time=18.0 ms
+64 bytes from 1.1.1.1: icmp_seq=5 ttl=54 time=18.8 ms
+64 bytes from 1.1.1.1: icmp_seq=6 ttl=54 time=18.2 ms
+^C
+--- 1.1.1.1 ping statistics ---
+6 packets transmitted, 6 received, 0% packet loss, time 5007ms
+rtt min/avg/max/mdev = 18.009/18.939/19.800/0.666 ms
+atnog@5gasp-nuc:~/Desktop/VehicleDetectionPoC/stream$ ip r
+default via 192.168.93.1 dev enx00e04c534458 proto dhcp metric 100 
+10.16.9.28/30 dev wwan0 proto kernel scope link src 10.16.9.29 
+10.42.0.0/24 dev cni0 proto kernel scope link src 10.42.0.1 
+169.254.0.0/16 dev br-38987688ce91 scope link metric 1000 
+172.17.0.0/16 dev docker0 proto kernel scope link src 172.17.0.1 linkdown 
+172.18.0.0/16 dev br-38987688ce91 proto kernel scope link src 172.18.0.1 
+192.168.93.0/24 dev enx00e04c534458 proto kernel scope link src 192.168.93.25 metric 100
