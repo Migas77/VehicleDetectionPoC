@@ -55,7 +55,7 @@ mediamtx-up: check-ip ## Run the MediaMTX streaming server via Docker
 	# 8890/udp   SRT             [not exposed]
 	# 8189/udp   WebRTC ICE/UDP
 	# -------------------
-	docker run -d --name mediamtx \
+	sudo docker run -d --name mediamtx \
 		-e MTX_RTSPTRANSPORTS=tcp \
 		-e MTX_WEBRTCADDITIONALHOSTS=$(MTX_WEBRTCADDITIONALHOSTS) \
 		-p 8554:8554 \
