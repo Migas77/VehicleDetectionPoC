@@ -13,7 +13,36 @@ STREAM_PATH ?= mystream
 VIDEOS_DRIVE_FOLDER_ID ?= 1jlTpVB6yf7tMdf_Hgwt2fT39tTRdYnyI
 VIDEOS_DIR ?= videos
 
-.PHONY: init-env check-ip video-download video-info mediamtx-up mediamtx-down stream-publish stream-play help
+# Directory where the stream-fps* targets write their per-run fps logs
+FPS_LOG_DIR ?= fps_logs
+
+# Headless RTSP receiver printing the video frames received in each wall-clock second, frames are discarded.
+# ffprobe prints one line per packet (no decode) or per decoded frame; gawk stamps each line with its arrival time
+# (gettimeofday, µs) and counts them in exact [hh:mm:ss, hh:mm:ss+1) buckets. The first, partial second is skipped and
+# seconds with no frames (freezes) are printed as 0. Minimal probing avoids a startup burst of buffered packets.
+# Output is also saved to FPS_LOG_DIR/fps_<label>_<start time>.log
+# Usage: $(call FPS_RECEIVER,<ffprobe -show_entries value>,<log label>)
+define FPS_RECEIVER
+mkdir -p "$(FPS_LOG_DIR)"; \
+log="$(FPS_LOG_DIR)/fps_$(2)_$$(date +%Y%m%d_%H%M%S).log"; \
+echo "Logging to $$log"; \
+stdbuf -oL ffprobe -hide_banner -v error -analyzeduration 0 -probesize 32 \
+	-rtsp_transport tcp -i rtsp://$(MEDIAMTX_IP):8554/$(STREAM_PATH) \
+	-select_streams v:0 -show_entries $(1) -of csv=p=0 \
+	| gawk -l time ' \
+		NF { \
+			t = int(gettimeofday()); \
+			if (cur == "") { cur = t; partial = 1 } \
+			while (t > cur) { \
+				if (!partial) { printf "%s  %d fps\n", strftime("%F %T", cur), n; fflush() } \
+				partial = 0; cur++; n = 0 \
+			} \
+			n++ \
+		}' \
+	| tee "$$log"
+endef
+
+.PHONY: init-env check-ip video-download video-info mediamtx-up mediamtx-down stream-publish stream-play stream-fps stream-fps-nodecode help
 
 init-env: ## Copy .env.example to .env (won't overwrite existing)
 	@if [ -f .env ]; then \
@@ -87,7 +116,7 @@ stream-publish: check-ip ## [sender] Loop VIDEO as an RTSP stream to rtsp://MEDI
 	fi
 	ffmpeg -re -stream_loop -1 -i $(VIDEO) \
 		-vf fps=30 \
-		-c:v libx264 -preset veryfast -tune zerolatency -bf 0 -pix_fmt yuv420p -g 60 \
+		-c:v libx264 -preset ultrafast -tune zerolatency -bf 0 -pix_fmt yuv420p -g 60 \
 		-c:a libopus -b:a 128k -ar 48000 \
 		-f rtsp -rtsp_transport tcp \
 		rtsp://$(MEDIAMTX_IP):8554/$(STREAM_PATH)
@@ -97,6 +126,12 @@ stream-play: check-ip ## [receiver] Play the remote RTSP stream rtsp://MEDIAMTX_
 		-fflags nobuffer -flags low_delay -framedrop \
 		-window_title "$(STREAM_PATH) @ $(MEDIAMTX_IP)" \
 		rtsp://$(MEDIAMTX_IP):8554/$(STREAM_PATH)
+
+stream-fps: check-ip ## [receiver] Print received fps every second, decoding each frame (real receiver: network + decode)
+	$(call FPS_RECEIVER,frame=best_effort_timestamp_time,decode)
+
+stream-fps-nodecode: check-ip ## [receiver] Print received fps every second, without decoding (network only)
+	$(call FPS_RECEIVER,packet=pts_time,nodecode)
 
 help: ## Show this help message with available targets and variables
 	@echo "Usage: make <target> [VAR=value ...]"
@@ -110,6 +145,7 @@ help: ## Show this help message with available targets and variables
 	@printf "  \033[33m%-15s\033[0m %s\n" STREAM_PATH "$(STREAM_PATH)"
 	@printf "  \033[33m%-15s\033[0m %s\n" VIDEOS_DIR "$(VIDEOS_DIR)"
 	@printf "  \033[33m%-15s\033[0m %s\n" VIDEOS_DRIVE_FOLDER_ID "$(VIDEOS_DRIVE_FOLDER_ID)"
+	@printf "  \033[33m%-15s\033[0m %s\n" FPS_LOG_DIR "$(FPS_LOG_DIR)"
 	@echo ""
 	@echo "Example:"
 	@echo "  make video-download"
@@ -117,3 +153,4 @@ help: ## Show this help message with available targets and variables
 	@echo "  make stream-publish MEDIAMTX_IP=$(MEDIAMTX_IP) VIDEO=$(VIDEO)"
 	@echo "  -> rtsp://$(MEDIAMTX_IP):8554/$(STREAM_PATH)"
 	@echo "  make stream-play MEDIAMTX_IP=$(MEDIAMTX_IP) STREAM_PATH=$(STREAM_PATH)"
+	@echo "  make stream-fps MEDIAMTX_IP=$(MEDIAMTX_IP)            (or stream-fps-nodecode)"
