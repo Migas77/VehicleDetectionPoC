@@ -91,10 +91,10 @@ class MqttCcamBackend(CcamInterface):
             ),
         )
         payload = message.model_dump_json()
-        LOG.info(
-            "Publishing DENM to topic=%s: (%d,%d)",
-            topic,
-            lat,
-            lon,
-        )
+        # LOG.info(
+        #     "Publishing DENM to topic=%s: (%d,%d)",
+        #     topic,
+        #     lat,
+        #     lon,
+        # )
         await self._client.publish(topic, payload, qos=1)

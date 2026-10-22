@@ -3,7 +3,9 @@ import logging
 from fastapi import APIRouter
 
 from app.drivers.application_profiles import ApplicationProfilesInterfaceDep
-from app.drivers.utilities import compare_min_rate_to_nef_bitrate
+from app.drivers.qod_provisioning import QoDProvisioningInterfaceDep
+from app.drivers.ues import UEsInterfaceDep
+from app.utilities import compare_min_rate_to_nef_bitrate
 from app.schemas.camara.application_profiles import NetworkQualityThresholds
 from app.schemas.camara.connectivity_insights_subscriptions import (
     NetworkQualityInsight,
@@ -32,12 +34,14 @@ async def nef_analytics_callback(
     ue_supi: str,
     body: AnalyticsEventNotification,
     application_profiles_interface: ApplicationProfilesInterfaceDep,
+    qod_provisioning_interface: QoDProvisioningInterfaceDep,
+    ues_interface: UEsInterfaceDep,
 ) -> None:
     """Receive WLAN_PERFORMANCE analytics notifications from the NEF."""
     notif_id = body.notifId
-    LOG.info(
-        "Received NEF analytics callback for UE supi=%s, notifId=%s", ue_supi, notif_id
-    )
+    # LOG.info(
+    #     "Received NEF analytics callback for UE supi=%s, notifId=%s", ue_supi, notif_id
+    # )
 
     if body.termCause is not None:
         LOG.warning(
@@ -51,12 +55,12 @@ async def nef_analytics_callback(
     profile = await application_profiles_interface.get_application_profile(ue_supi)
     thresholds = profile.networkQualityThresholds
     if thresholds is None or not thresholds.model_dump(exclude_none=True):
-        LOG.info(
-            "UE supi=%s, notifId=%s: Empty/None thresholds for profile %s, skipping",
-            ue_supi,
-            notif_id,
-            profile.applicationProfileId,
-        )
+        # LOG.info(
+        #     "UE supi=%s, notifId=%s: Empty/None thresholds for profile %s, skipping",
+        #     ue_supi,
+        #     notif_id,
+        #     profile.applicationProfileId,
+        # )
         return
 
     insight = NetworkQualityInsight(
@@ -95,13 +99,26 @@ async def nef_analytics_callback(
             len(notif.wlanInfos),
         )
 
+    # notifId carries the application profile id, so the gpsi must come from the UE itself
+    # (same msisdn-based gpsi used as tgtUe when creating the subscription)
+    ue = await ues_interface.get_ue_by_supi(ue_supi)
+    if ue.msisdn is None:
+        # should never happen (subscription creation requires msisdn)
+        LOG.warning(
+            "UE supi=%s, notifId=%s: UE has no msisdn, cannot match WLAN_PERFORMANCE info",
+            ue_supi,
+            notif_id,
+        )
+        return
+    ue_gpsi = f"msisdn-{ue.msisdn}"
+
     wlan_info = notif.wlanInfos[0]
     ue_info = (
         next(
             (
                 ue_entry.root
                 for ue_entry in wlan_info.wlanPerUeIdInfos
-                if ue_entry.root.gpsi and ue_entry.root.gpsi == f"msisdn-{notif_id}"
+                if ue_entry.root.gpsi and ue_entry.root.gpsi == ue_gpsi
             ),
             None,
         )
@@ -135,13 +152,24 @@ async def nef_analytics_callback(
         if was_updated and _all_requirements_unmet(insight):
             break
 
-    LOG.info(
-        "UE supi=%s, notifId=%s: analytics SLA check — UL=%s, DL=%s",
-        ue_supi,
-        notif_id,
-        insight.targetMinUpstreamRate,
-        insight.targetMinDownstreamRate,
-    )
+    # LOG.info(
+    #     "UE supi=%s, notifId=%s: analytics SLA check — UL=%s, DL=%s",
+    #     ue_supi,
+    #     notif_id,
+    #     insight.targetMinUpstreamRate,
+    #     insight.targetMinDownstreamRate,
+    # )
+    if _any_requirement_unmet(
+        insight
+    ) and await qod_provisioning_interface.can_switch_to_fallback_qos_profile(ue_supi):
+        LOG.warning(
+            "UE supi=%s, notifId=%s: analytics breach detected (UL=%s, DL=%s)",
+            ue_supi,
+            notif_id,
+            insight.targetMinUpstreamRate,
+            insight.targetMinDownstreamRate,
+        )
+        await qod_provisioning_interface.switch_to_fallback_qos_profile(ue)
     # TODO: propagate insight to application state store
 
 
@@ -194,6 +222,12 @@ def _all_requirements_unmet(insight: NetworkQualityInsight) -> bool:
     """Return True if all checked requirements are unmet."""
     checks = [insight.targetMinUpstreamRate, insight.targetMinDownstreamRate]
     return all(v == _REQUIREMENTS_UNMET for v in checks)
+
+
+def _any_requirement_unmet(insight: NetworkQualityInsight) -> bool:
+    """Return True if at least one checked requirement is unmet (i.e. a breach)."""
+    checks = [insight.targetMinUpstreamRate, insight.targetMinDownstreamRate]
+    return any(v == _REQUIREMENTS_UNMET for v in checks)
 
 
 def _worst_confidence(

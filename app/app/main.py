@@ -3,8 +3,9 @@ import logging
 from collections.abc import AsyncGenerator
 from contextlib import asynccontextmanager
 from typing import cast, Iterable
+from uuid import UUID
 
-from fastapi import FastAPI
+from fastapi import Body, FastAPI
 from fastapi.middleware.cors import CORSMiddleware
 
 from app.capif.invoker import capif_invoker
@@ -57,6 +58,8 @@ async def _cleanup_stale_camera_qod_provisioning(
 ) -> None:
     """Delete any pre-existing QoD provisioning for each camera UE before assigning new ones."""
     for camera in camera_ues:
+        await qod_provisioning_interface.clear_fallback_qos_profile(camera.supi)
+        await qod_provisioning_interface.clear_qos_state(camera.supi)
         provisioning_id = (
             await qod_provisioning_interface.retrieve_qod_provisioning_by_device(camera)
         )
@@ -346,6 +349,7 @@ async def cleanup_poc(
         if provisioning_id is not None:
             await qod_provisioning_interface.delete_qod_provisioning(provisioning_id)
             deleted += 1
+        await qod_provisioning_interface.clear_qos_state(camera.supi)
     LOG.info("QoD provisioning deleted for %d camera(s)", deleted)
 
     return {"internal_cleanup": "OK"}
@@ -377,3 +381,201 @@ async def cleanup_inference(
     ]
     await _terminate_camera_inference_pipelines(crash_inference_interface, camera_ues)
     return {"inference_cleanup": "OK"}
+
+
+###############################################################################
+###                                                                         ###
+###                                 TESTS                                    ###
+###                                                                         ###
+###   Per-API bootstrap/cleanup endpoints that slice /internal/bootstrap     ###
+###   into one network API at a time, so each API can be exercised and       ###
+###   benchmarked in isolation. Every route reuses the same helpers as the   ###
+###   monolithic bootstrap/cleanup above.                                    ###
+###                                                                         ###
+###############################################################################
+
+
+async def _test_camera_ues(ues_interface: UEsInterface) -> list[CameraUE]:
+    """Fetch the static + dynamic camera UEs — the target of every per-API test route."""
+    ues_by_type = await ues_interface.get_poc_ues_by_type()
+    return [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+
+
+# --- QoS Profiles ------------------------------------------------------------
+
+
+@app.post("/test/qos-profiles/bootstrap")
+async def test_qos_profiles_bootstrap(
+    qos_profiles_interface: QoSProfilesInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    profiles = await qos_profiles_interface.get_qos_profiles()
+    LOG.info("Available QoS profiles: %s", profiles)
+    await _verify_camera_qos_profiles(
+        qos_profiles_interface, await _test_camera_ues(ues_interface)
+    )
+    return {"test_qos_profiles_bootstrap": "OK"}
+
+
+@app.post("/test/qos-profiles/cleanup")
+async def test_qos_profiles_cleanup() -> dict[str, str]:
+    # QoS profiles are read-only network resources — nothing to tear down.
+    return {"test_qos_profiles_cleanup": "OK"}
+
+
+# --- QoD Provisioning ------------------------------------------------------------
+
+
+@app.post("/test/qod-provisioning/bootstrap")
+async def test_qod_provisioning_bootstrap(
+    qod_provisioning_interface: QoDProvisioningInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    camera_ues = await _test_camera_ues(ues_interface)
+    await _cleanup_stale_camera_qod_provisioning(qod_provisioning_interface, camera_ues)
+    provisioning_ids = await _assign_camera_qos_provisioning(
+        qod_provisioning_interface, camera_ues
+    )
+    LOG.info("QoD provisioning created for %d camera(s)", len(provisioning_ids))
+    return {"test_qod_provisioning_bootstrap": "OK"}
+
+
+@app.post("/test/qod-provisioning/cleanup")
+async def test_qod_provisioning_cleanup(
+    qod_provisioning_interface: QoDProvisioningInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    deleted = 0
+    for camera in await _test_camera_ues(ues_interface):
+        provisioning_id = (
+            await qod_provisioning_interface.retrieve_qod_provisioning_by_device(camera)
+        )
+        if provisioning_id is not None:
+            await qod_provisioning_interface.delete_qod_provisioning(provisioning_id)
+            deleted += 1
+        await qod_provisioning_interface.clear_qos_state(camera.supi)
+    LOG.info("QoD provisioning deleted for %d camera(s)", deleted)
+    return {"test_qod_provisioning_cleanup": "OK"}
+
+
+# --- Application Profiles ------------------------------------------------------------
+
+
+@app.post("/test/application-profiles/bootstrap")
+async def test_application_profiles_bootstrap(
+    application_profiles_interface: ApplicationProfilesInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    profile_ids: dict[str, str] = {}
+    for camera in await _test_camera_ues(ues_interface):
+        profile = await application_profiles_interface.create_application_profile(
+            camera
+        )
+        profile_ids[camera.supi] = str(profile.applicationProfileId)
+    LOG.info("Application profiles created for %d camera(s)", len(profile_ids))
+    return profile_ids
+
+
+@app.post("/test/application-profiles/cleanup")
+async def test_application_profiles_cleanup(
+    application_profiles_interface: ApplicationProfilesInterfaceDep,
+    application_profile_ids: list[UUID] = Body(default_factory=list),
+) -> dict[str, str]:
+    # Application profiles are not tracked in Redis; pass the ids returned by
+    # bootstrap to delete them (empty body is a no-op, matching /internal/cleanup).
+    deleted = 0
+    for profile_id in application_profile_ids:
+        if await application_profiles_interface.delete_application_profile(profile_id):
+            deleted += 1
+    LOG.info("Application profiles deleted: %d", deleted)
+    return {"test_application_profiles_cleanup": "OK"}
+
+
+# --- Analytics ------------------------------------------------------------
+
+
+@app.post("/test/analytics/bootstrap")
+async def test_analytics_bootstrap(
+    analytics_interface: AnalyticsInterfaceDep,
+    application_profiles_interface: ApplicationProfilesInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    await _create_camera_analytics_setup(
+        application_profiles_interface,
+        analytics_interface,
+        await _test_camera_ues(ues_interface),
+    )
+    return {"test_analytics_bootstrap": "OK"}
+
+
+@app.post("/test/analytics/cleanup")
+async def test_analytics_cleanup(
+    analytics_interface: AnalyticsInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    await _cleanup_camera_analytics_subscriptions(
+        analytics_interface, await _test_camera_ues(ues_interface)
+    )
+    return {"test_analytics_cleanup": "OK"}
+
+
+# --- Geofencing ------------------------------------------------------------
+
+
+@app.post("/test/geofencing/bootstrap")
+async def test_geofencing_bootstrap(
+    geofencing_interface: GeofencingInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    ues_by_type = await ues_interface.get_poc_ues_by_type()
+    camera_ues: list[CameraUE] = [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+    pedestrian_ues = ues_by_type["pedestrian_ues"]
+    # stale-cleanup any geofencing subscriptions/occupant sets from a previous run
+    await _cleanup_pedestrian_geofencing(
+        geofencing_interface, camera_ues, pedestrian_ues
+    )
+    await _create_pedestrian_geofencing_setup(
+        geofencing_interface, camera_ues, pedestrian_ues
+    )
+    return {"test_geofencing_bootstrap": "OK"}
+
+
+@app.post("/test/geofencing/cleanup")
+async def test_geofencing_cleanup(
+    geofencing_interface: GeofencingInterfaceDep,
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    ues_by_type = await ues_interface.get_poc_ues_by_type()
+    camera_ues: list[CameraUE] = [
+        *ues_by_type["static_camera_ues"],
+        *ues_by_type["dynamic_camera_ues"],
+    ]
+    await _cleanup_pedestrian_geofencing(
+        geofencing_interface, camera_ues, ues_by_type["pedestrian_ues"]
+    )
+    return {"test_geofencing_cleanup": "OK"}
+
+
+# --- UEs (movement) ------------------------------------------------------------
+
+
+@app.post("/test/ues/bootstrap")
+async def test_ues_bootstrap(
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    await _start_moving_ues(ues_interface, await ues_interface.get_poc_ues_by_type())
+    return {"test_ues_bootstrap": "OK"}
+
+
+@app.post("/test/ues/cleanup")
+async def test_ues_cleanup(
+    ues_interface: UEsInterfaceDep,
+) -> dict[str, str]:
+    await _stop_moving_ues(ues_interface, await ues_interface.get_poc_ues_by_type())
+    return {"test_ues_cleanup": "OK"}

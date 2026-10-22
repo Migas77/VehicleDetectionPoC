@@ -5,7 +5,7 @@ from typing import Any, Optional
 import httpx
 from pydantic import TypeAdapter
 
-from app.drivers.utilities import rate_to_bps
+from app.utilities import rate_to_bps
 from app.drivers.capif_auth import discover_camara_url
 from app.interfaces.qos_profiles import QoSProfilesInterface
 from app.schemas.camara.qos_profiles import (
@@ -54,7 +54,7 @@ class CamaraQoSProfilesBackend(QoSProfilesInterface):
 
     async def verify_qos_profile(self, ue: UeWithQoS) -> bool:
         name = ue.qos_profile.qos_profile_name
-        LOG.info("Verifying CAMARA QoS profile '%s' for UE supi=%s", name, ue.supi)
+        # LOG.info("Verifying CAMARA QoS profile '%s' for UE supi=%s", name, ue.supi)
         res = await self._client.get(
             discover_camara_url(
                 fallback="/qos-profiles/v1/qos-profiles/{name}",
@@ -120,5 +120,5 @@ class CamaraQoSProfilesBackend(QoSProfilesInterface):
             )
             return False
 
-        LOG.info("CAMARA QoS profile '%s' verified", name)
+        # LOG.info("CAMARA QoS profile '%s' verified", name)
         return True

@@ -6,6 +6,7 @@ from typing_extensions import Annotated
 from pydantic import BaseModel, Field
 
 from .commonData import (
+    Dnn,
     SupportedFeatures,
     Link,
     Gpsi,
@@ -32,6 +33,7 @@ class AsSessionWithQoSSubscription(AsSessionWithQoSSubscriptionBase):
     self: Optional[Link] = None
     supportedFeatures: Optional[SupportedFeatures] = None
     notificationDestination: Link
+    dnn: Optional[Dnn] = None
     gpsi: Optional[Gpsi] = None
     ueIpv4Addr: Optional[IPv4Address] = None
     ueIpv6Addr: Optional[IPv6Address] = None

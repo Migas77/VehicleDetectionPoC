@@ -1,9 +1,12 @@
 export interface QosProfile {
     qos_profile_name: string;
-    min_ul_bitrate: string;
     max_ul_bitrate: string;
-    min_dl_bitrate: string;
     max_dl_bitrate: string;
+}
+
+export interface StreamRequirements {
+    min_ul_bitrate: string;
+    min_dl_bitrate: string;
 }
 
 export interface SurveyedAreaPoint {
@@ -28,6 +31,7 @@ export interface CameraInferenceConfig {
 export interface CameraInfo {
     ue_supi: string;
     qos_profile: QosProfile;
+    stream_requirements: StreamRequirements;
     surveyed_area: SurveyedAreaOut;
     inference: CameraInferenceConfig;
 }

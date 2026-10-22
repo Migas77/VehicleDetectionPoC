@@ -31,4 +31,4 @@ class NefSMSBackend(SMSInterface):
         if not res.is_success:
             raise RuntimeError(f"NEF SMS send failed ({res.status_code}): {res.text}")
 
-        LOG.info("SMS sent to UE supi=%s msisdn=%s", ue.supi, ue.msisdn)
+        # LOG.info("SMS sent to UE supi=%s msisdn=%s", ue.supi, ue.msisdn)

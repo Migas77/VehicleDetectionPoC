@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import cached_property
 
 import httpx
@@ -85,15 +86,28 @@ class NefAnalyticsBackend(AnalyticsInterface):
             api_name_filter="analyticsexposure",
             operation="POST",
         ).format(afId=settings.poc_af_id)
-        LOG.info(
-            "Creating NEF analytics subscription for UE supi=%s, applicationProfileId=%s",
-            ue.supi,
-            application_profile_id,
-        )
+        # LOG.info(
+        #     "Creating NEF analytics subscription for UE supi=%s, applicationProfileId=%s",
+        #     ue.supi,
+        #     application_profile_id,
+        # )
+        body = payload.model_dump_json(exclude_none=True)
+        # await asyncio.sleep(8)  # benchmark: measure from a cold http connection
+        _bench_start_ns = time.perf_counter_ns()
         res = await self._client.post(
             url,
-            content=payload.model_dump_json(exclude_none=True),
+            content=body,
             headers={"Content-Type": "application/json"},
+        )
+        _bench_elapsed_ns = time.perf_counter_ns() - _bench_start_ns
+        LOG.info(
+            'BENCHMARK: {"api": "NEF", "resource": "Create Subscription", '
+            '"filter": "analyticsexposure", "op": "POST", '
+            '"x_correlator": "%s", "ue": "%s", "time_ns": %d, "status": %d}',
+            res.request.headers.get("x-correlator") or "",
+            ue.supi,
+            _bench_elapsed_ns,
+            res.status_code,
         )
         if not res.is_success:
             raise RuntimeError(
@@ -106,17 +120,17 @@ class NefAnalyticsBackend(AnalyticsInterface):
             )
         sub_id = self._extract_subscription_id(str(subscription.self))
         await self._redis.set(self._subscription_key(ue.supi, sub_id), sub_id)
-        LOG.info(
-            "NEF analytics subscription created for UE supi=%s, subscriptionId=%s",
-            ue.supi,
-            sub_id,
-        )
+        # LOG.info(
+        #     "NEF analytics subscription created for UE supi=%s, subscriptionId=%s",
+        #     ue.supi,
+        #     sub_id,
+        # )
         return sub_id
 
     async def delete_analytics_subscription(
         self, ue: UeWithQoS, subscription_id: str
     ) -> bool:
-        LOG.info("Deleting NEF analytics subscription id=%s", subscription_id)
+        # LOG.info("Deleting NEF analytics subscription id=%s", subscription_id)
         url = discover_nef_url(
             fallback="/nef/api/v1/3gpp-analyticsexposure/v1/{afId}/subscriptions/{subscriptionId}",
             resource_name="Delete Subscription",
@@ -136,9 +150,9 @@ class NefAnalyticsBackend(AnalyticsInterface):
                 f"NEF analytics subscription delete failed ({res.status_code}): {res.text}"
             )
         await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
-        LOG.info(
-            "NEF analytics subscription deleted, subscriptionId=%s", subscription_id
-        )
+        # LOG.info(
+        #     "NEF analytics subscription deleted, subscriptionId=%s", subscription_id
+        # )
         return True
 
     @staticmethod

@@ -1,9 +1,10 @@
-from typing import Annotated
-
-from fastapi import APIRouter, Depends
+from fastapi import APIRouter
 
 from app.interfaces.qod_provisioning import QoDProvisioningInterface
 from app.settings import settings
+
+from .deps import QoDProvisioningInterfaceDep as QoDProvisioningInterfaceDep
+from .deps import get_qod_provisioning_interface as get_qod_provisioning_interface
 
 qod_provisioning_interface: QoDProvisioningInterface
 router = APIRouter(prefix="/callbacks/qod-provisioning")
@@ -21,12 +22,3 @@ match settings.net_apis.api:
 
         qod_provisioning_interface = camara_qod_provisioning_interface
         router.include_router(camara_router)
-
-
-async def get_qod_provisioning_interface() -> QoDProvisioningInterface:
-    return qod_provisioning_interface
-
-
-QoDProvisioningInterfaceDep = Annotated[
-    QoDProvisioningInterface, Depends(get_qod_provisioning_interface)
-]

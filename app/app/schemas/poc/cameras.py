@@ -4,9 +4,10 @@ from typing import Annotated, Any
 from pydantic import BaseModel, Field, model_validator
 
 from app.schemas.camara.common import Point
+from app.schemas.poc.qos_state import CameraQosState
 from app.schemas.poc.ue_with_qos import UeWithQoS
 from app.schemas.qos_profile import QosProfile
-from app.settings import CameraInferenceConfig, settings
+from app.settings import CameraInferenceConfig, StreamRequirementsConfig, settings
 
 LOG = logging.getLogger(__name__)
 
@@ -57,9 +58,11 @@ class SurveyedAreaOut(BaseModel):
 
 
 class CameraInfo(BaseModel):
-    """Full per-camera configuration, as resolved from cameras.toml."""
+    """Full per-camera configuration, as resolved from cameras.toml, plus its runtime QoS state."""
 
     ue_supi: str
     qos_profile: QosProfile
+    stream_requirements: StreamRequirementsConfig
     surveyed_area: SurveyedAreaOut
     inference: CameraInferenceConfig
+    qos_state: CameraQosState | None = None  # None until the camera is provisioned

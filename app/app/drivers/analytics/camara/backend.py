@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import cached_property
 
 import httpx
@@ -78,22 +79,36 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
                 )
             ),
         )
-        LOG.info(
-            "Creating CAMARA CIS subscription for UE supi=%s, applicationProfileId=%s",
-            ue.supi,
-            application_profile_id,
+        # LOG.info(
+        #     "Creating CAMARA CIS subscription for UE supi=%s, applicationProfileId=%s",
+        #     ue.supi,
+        #     application_profile_id,
+        # )
+        url = discover_camara_url(
+            fallback="/connectivity-insights-subscriptions/v0.6/subscriptions",
+            resource_name="Create Subscription",
+            api_name_filter="connectivity-insights-subscriptions",
+            operation="POST",
         )
+        body = SubscriptionRequestTypeAdapter.dump_json(payload, exclude_unset=True)
+        # await asyncio.sleep(8)  # benchmark: measure from a cold http connection
+        LOG.info("DELAY: request sent")
+        _bench_start_ns = time.perf_counter_ns()
         res = await self._client.post(
-            discover_camara_url(
-                fallback="/connectivity-insights-subscriptions/v0.6/subscriptions",
-                resource_name="Create Subscription",
-                api_name_filter="connectivity-insights-subscriptions",
-                operation="POST",
-            ),
-            content=SubscriptionRequestTypeAdapter.dump_json(
-                payload, exclude_unset=True
-            ),
+            url,
+            content=body,
             headers={"Content-Type": "application/json"},
+        )
+        LOG.info("DELAY: request responded")
+        _bench_elapsed_ns = time.perf_counter_ns() - _bench_start_ns
+        LOG.info(
+            'BENCHMARK: {"api": "CAMARA", "resource": "Create Subscription", '
+            '"filter": "connectivity-insights-subscriptions", "op": "POST", '
+            '"x_correlator": "%s", "ue": "%s", "time_ns": %d, "status": %d}',
+            res.request.headers.get("x-correlator") or "",
+            ue.supi,
+            _bench_elapsed_ns,
+            res.status_code,
         )
         if not res.is_success:
             raise RuntimeError(
@@ -102,17 +117,17 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
         subscription = CISSubscriptionTypeAdapter.validate_json(res.content)
         sub_id = subscription.id
         await self._redis.set(self._subscription_key(ue.supi, sub_id), sub_id)
-        LOG.info(
-            "CAMARA CIS subscription created for UE supi=%s, subscriptionId=%s",
-            ue.supi,
-            sub_id,
-        )
+        # LOG.info(
+        #     "CAMARA CIS subscription created for UE supi=%s, subscriptionId=%s",
+        #     ue.supi,
+        #     sub_id,
+        # )
         return sub_id
 
     async def delete_analytics_subscription(
         self, ue: UeWithQoS, subscription_id: str
     ) -> bool:
-        LOG.info("Deleting CAMARA CIS subscription id=%s", subscription_id)
+        # LOG.info("Deleting CAMARA CIS subscription id=%s", subscription_id)
         res = await self._client.delete(
             discover_camara_url(
                 fallback="/connectivity-insights-subscriptions/v0.6/subscriptions/{subscriptionId}",
@@ -132,5 +147,5 @@ class CamaraAnalyticsBackend(AnalyticsInterface):
                 f"CAMARA CIS subscription delete failed ({res.status_code}): {res.text}"
             )
         await self._redis.delete(self._subscription_key(ue.supi, subscription_id))
-        LOG.info("CAMARA CIS subscription id=%s deleted", subscription_id)
+        # LOG.info("CAMARA CIS subscription id=%s deleted", subscription_id)
         return True

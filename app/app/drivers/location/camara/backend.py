@@ -64,7 +64,7 @@ class CamaraLocationBackend(LocationInterface):
 
     async def retrieve_location(self, ue: UE) -> Location:
         payload = RetrievalLocationRequest(device=self._build_device(ue))
-        LOG.info("Retrieving CAMARA location for UE supi=%s", ue.supi)
+        # LOG.info("Retrieving CAMARA location for UE supi=%s", ue.supi)
         res = await self._client.post(
             discover_camara_url(
                 fallback="/location-retrieval/v0.4/retrieve",
@@ -82,9 +82,9 @@ class CamaraLocationBackend(LocationInterface):
         data = _dict_adapter.validate_json(res.content)
         area = self._parse_area(data.get("area", {}), ue.supi)
         location = Location(lastLocationTime=data["lastLocationTime"], area=area)
-        LOG.info(
-            "CAMARA location retrieved for UE supi=%s: areaType=%s",
-            ue.supi,
-            location.area.areaType,
-        )
+        # LOG.info(
+        #     "CAMARA location retrieved for UE supi=%s: areaType=%s",
+        #     ue.supi,
+        #     location.area.areaType,
+        # )
         return location

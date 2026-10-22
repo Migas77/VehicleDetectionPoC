@@ -1,11 +1,11 @@
 log_level = "INFO"
 poc_title = "Vehicle Crash Detection PoC"
 poc_af_id = "VehicleCrashDetectionPoC"
-poc_app_server = "10.100.0.1"
+poc_app_server = "10.255.27.58"
 cors_allow_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
 [net_apis]
-api = "camara"
+api = "nef"
 auth_mode = "other"
 
 [camara]
@@ -14,15 +14,27 @@ url = "http://localhost:8000"
 poc_notification_url = "http://localhost:8080"
 
 [nef]
-# username and password required when net_apis.auth_mode = "other"
+# username and password are always required: the NEF management APIs (/api/v1/...)
+# are not published to CAPIF, so they are always called with the NEF login
 url = "http://localhost:8888"
 username = "admin@my-email.com"
 password = "pass"
 poc_notification_url = "http://host.docker.internal:8080"
+# DNN of the slice the AsSessionWithQoS subscriptions apply to (no S-NSSAI is sent)
+qos_dnn = "embb"
 
 [capif_sdk]
-capif_username = "username"
+# only used when net_apis.auth_mode = "capif" (the PoC onboards as a CAPIF API invoker)
+capif_host = "capifcore"
+register_host = "capifcore"
+capif_https_port = 443
+capif_register_port = 8084
+debug_mode = true
+capif_username = "poc-invoker"
 capif_password = "password"
+capif_callback_url = "http://localhost:8080/callback/"
+# offboard the invoker from CAPIF core on shutdown
+cleanup_on_shutdown = false
 
 [analytics]
 offset_period = -5
@@ -30,7 +42,7 @@ temporal_gran_size = 5
 rep_period = 5
 
 [roboflow]
-api_key = "replace_me"
+api_key = "0CEH7j4W8B4kwCReiyrW"
 
 [crash_inference]
 model_id = "accident-detection-qgglm/3"
@@ -38,8 +50,8 @@ classes = ["Accident", "mild", "moderate", "severe"]
 debounce_seconds = 4
 intervention_threshold = 0.40
 average_car_crash_duration = 0.20 # seconds
-inference_server_url = "http://192.168.0.154:9001"
-poc_notification_url = "http://192.168.0.180:8080"
+inference_server_url = "http://192.168.93.55:9001"
+poc_notification_url = "http://192.168.93.56:8080"
 
 [redis]
 url = "redis://localhost:6379"
@@ -47,7 +59,7 @@ url = "redis://localhost:6379"
 # password = "..."   # optional
 
 [ccam_broker]
-backend = "mqtt"
+backend = "mock"
 client_id = "vehicle-detection-poc"
 host = "es-broker.av.it.pt"
 port = 8090

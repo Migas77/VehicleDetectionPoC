@@ -15,6 +15,7 @@ from app.schemas.poc.crash_status import (
 from app.schemas.poc.geofencing import GeofenceState, ManagedGeofencingSubscription
 from app.schemas.poc.pedestrian import PedestrianUE
 from app.schemas.poc.poc_ue import PocUE
+from app.schemas.poc.qos_state import CameraQosState, QosStatus
 from app.schemas.poc.ue import UE
 from app.schemas.poc.ue_with_qos import UeWithQoS
 
@@ -35,4 +36,6 @@ __all__ = [
     "CrashNotificationStatus",
     "CrashNotificationChannel",
     "CrashStatusEvent",
+    "CameraQosState",
+    "QosStatus",
 ]

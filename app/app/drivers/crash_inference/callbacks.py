@@ -101,12 +101,12 @@ async def _process_detection(
 
     detections_number: int = payload.get("detections_number", 0)
     frame_number = payload.get("frame_number")
-    LOG.info(
-        "Processing inference result: detections=%s, frame=%s, all=%s",
-        detections_number,
-        frame_number,
-        payload,
-    )
+    # LOG.info(
+    #     "Processing inference result: detections=%s, frame=%s, all=%s",
+    #     detections_number,
+    #     frame_number,
+    #     payload,
+    # )
 
     streak_key = f"{_STREAK_KEY_PREFIX}{ue_supi}"
     if frame_number is None:
@@ -222,10 +222,10 @@ async def _send_crash_sms_to_nearby_pedestrians(
 ) -> None:
     nearby_supis = await geofencing.get_camera_area_subscribers(camera_supi)
     if not nearby_supis:
-        LOG.info(
-            "No nearby UEs in camera supi=%s area, skipping SMS notifications",
-            camera_supi,
-        )
+        # LOG.info(
+        #     "No nearby UEs in camera supi=%s area, skipping SMS notifications",
+        #     camera_supi,
+        # )
         return
 
     await asyncio.gather(

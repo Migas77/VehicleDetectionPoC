@@ -124,12 +124,12 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
             return None
 
         video_reference, inference_config = enabled_inference
-        LOG.info(
-            "Starting crash inference pipeline (camera_supi=%s, model=%s, video=%s)",
-            camera.supi,
-            settings.crash_inference.model_id,
-            video_reference,
-        )
+        # LOG.info(
+        #     "Starting crash inference pipeline (camera_supi=%s, model=%s, video=%s)",
+        #     camera.supi,
+        #     settings.crash_inference.model_id,
+        #     video_reference,
+        # )
         payload = {
             "api_key": settings.roboflow.api_key,
             "video_configuration": {
@@ -155,11 +155,11 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
         data = res.json()
         pipeline_id: str = data["context"]["pipeline_id"]
         await self._redis.set(self._pipeline_key(camera.supi), pipeline_id)
-        LOG.info(
-            "Crash inference pipeline started, camera_supi=%s, pipeline_id=%s",
-            camera.supi,
-            pipeline_id,
-        )
+        # LOG.info(
+        #     "Crash inference pipeline started, camera_supi=%s, pipeline_id=%s",
+        #     camera.supi,
+        #     pipeline_id,
+        # )
         return pipeline_id
 
     async def terminate_pipeline(self, camera: CameraUE) -> None:
@@ -171,11 +171,11 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
                 "No running inference pipeline found for camera supi=%s", camera.supi
             )
             return
-        LOG.info(
-            "Terminating crash inference pipeline id=%s for camera supi=%s",
-            pipeline_id,
-            camera.supi,
-        )
+        # LOG.info(
+        #     "Terminating crash inference pipeline id=%s for camera supi=%s",
+        #     pipeline_id,
+        #     camera.supi,
+        # )
 
         res = await self._client.post(
             f"/inference_pipelines/{pipeline_id}/terminate",
@@ -187,8 +187,8 @@ class RoboflowCrashInferenceBackend(CrashInferenceInterface):
             )
 
         await self._redis.delete(self._pipeline_key(camera.supi))
-        LOG.info(
-            "Crash inference pipeline terminated, camera_supi=%s, pipeline_id=%s",
-            camera.supi,
-            pipeline_id,
-        )
+        # LOG.info(
+        #     "Crash inference pipeline terminated, camera_supi=%s, pipeline_id=%s",
+        #     camera.supi,
+        #     pipeline_id,
+        # )

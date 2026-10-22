@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import cached_property
 from ipaddress import IPv4Address, IPv6Address
 
@@ -90,21 +91,36 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 protocol=Protocol.HTTP,
                 config=SubscriptionConfig(subscriptionDetail=detail),
             )
+            # LOG.info(
+            #     "Creating CAMARA geofencing subscription for UE supi=%s, camera supi=%s, type=%s",
+            #     ue.supi,
+            #     area.camera_supi,
+            #     event_type.value,
+            # )
+            url = discover_camara_url(
+                fallback="/geofencing-subscriptions/v0.4/subscriptions",
+                resource_name="Post Subscriptions",
+                api_name_filter="geofencing-subscriptions",
+                operation="POST",
+            )
+            body = payload.model_dump_json(exclude_unset=True)
+            # await asyncio.sleep(8)  # benchmark: measure from a cold http connection
+            _bench_start_ns = time.perf_counter_ns()
+            res = await self._client.post(
+                url,
+                content=body,
+                headers={"Content-Type": "application/json"},
+            )
+            _bench_elapsed_ns = time.perf_counter_ns() - _bench_start_ns
             LOG.info(
-                "Creating CAMARA geofencing subscription for UE supi=%s, camera supi=%s, type=%s",
+                'BENCHMARK: {"api": "CAMARA", "resource": "Post Subscriptions", '
+                '"filter": "geofencing-subscriptions", "op": "POST", '
+                '"x_correlator": "%s", "ue": "%s", "camera": "%s", "time_ns": %d, "status": %d}',
+                res.request.headers.get("x-correlator") or "",
                 ue.supi,
                 area.camera_supi,
-                event_type.value,
-            )
-            res = await self._client.post(
-                discover_camara_url(
-                    fallback="/geofencing-subscriptions/v0.4/subscriptions",
-                    resource_name="Post Subscriptions",
-                    api_name_filter="geofencing-subscriptions",
-                    operation="POST",
-                ),
-                content=payload.model_dump_json(exclude_unset=True),
-                headers={"Content-Type": "application/json"},
+                _bench_elapsed_ns,
+                res.status_code,
             )
             if not res.is_success:
                 raise RuntimeError(
@@ -114,17 +130,17 @@ class CamaraGeofencingBackend(GeofencingInterface):
             sub_id = subscription.id
             await self._redis.set(self.subscription_key(ue.supi, sub_id), sub_id)
             subscription_ids.append(sub_id)
-            LOG.info(
-                "CAMARA geofencing subscription created for UE supi=%s, subscriptionId=%s",
-                ue.supi,
-                sub_id,
-            )
+            # LOG.info(
+            #     "CAMARA geofencing subscription created for UE supi=%s, subscriptionId=%s",
+            #     ue.supi,
+            #     sub_id,
+            # )
         return subscription_ids
 
     async def delete_geofencing_subscription(
         self, ue: UE, subscription_id: str
     ) -> bool:
-        LOG.info("Deleting CAMARA geofencing subscription id=%s", subscription_id)
+        # LOG.info("Deleting CAMARA geofencing subscription id=%s", subscription_id)
         res = await self._client.delete(
             discover_camara_url(
                 fallback="/geofencing-subscriptions/v0.4/subscriptions/{subscriptionId}",
@@ -145,5 +161,5 @@ class CamaraGeofencingBackend(GeofencingInterface):
                 f"CAMARA geofencing subscription delete failed ({res.status_code}): {res.text}"
             )
         await self._redis.delete(self.subscription_key(ue.supi, subscription_id))
-        LOG.info("CAMARA geofencing subscription id=%s deleted", subscription_id)
+        # LOG.info("CAMARA geofencing subscription id=%s deleted", subscription_id)
         return True

@@ -2,6 +2,8 @@ import logging
 
 from fastapi import APIRouter, HTTPException
 
+from app.drivers.qod_provisioning import QoDProvisioningInterfaceDep
+from app.interfaces.qod_provisioning import QoDProvisioningInterface
 from app.schemas.poc.cameras import CameraInfo, SurveyedAreaOut
 from app.settings import SurveyedAreaConfig, settings
 
@@ -11,30 +13,41 @@ router = APIRouter(prefix="/cameras")
 
 
 @router.get("")
-async def list_cameras() -> list[CameraInfo]:
-    """List the full configuration of every camera declared in cameras.toml."""
-    return [_camera_info(supi) for supi in sorted(_camera_supis())]
+async def list_cameras(
+    qod_provisioning_interface: QoDProvisioningInterfaceDep,
+) -> list[CameraInfo]:
+    """List the full configuration and QoS state of every camera declared in cameras.toml."""
+    return [
+        await _camera_info(supi, qod_provisioning_interface)
+        for supi in sorted(_camera_supis())
+    ]
 
 
 @router.get("/{ue_supi}")
-async def get_camera(ue_supi: str) -> CameraInfo:
-    """Get the full configuration of a single camera by its UE supi."""
+async def get_camera(
+    ue_supi: str, qod_provisioning_interface: QoDProvisioningInterfaceDep
+) -> CameraInfo:
+    """Get the full configuration and QoS state of a single camera by its UE supi."""
     if ue_supi not in _camera_supis():
         raise HTTPException(status_code=404, detail=f"Unknown camera supi={ue_supi}")
-    return _camera_info(ue_supi)
+    return await _camera_info(ue_supi, qod_provisioning_interface)
 
 
 def _camera_supis() -> set[str]:
     camera_supis = (
         set(settings.cameras.qos_profiles_assignment)
         | set(settings.cameras.surveyed_areas)
+        | set(settings.cameras.stream_requirements)
         | set(settings.cameras.inference)
     )
     camera_supis.discard("default")
+    camera_supis.discard("fallback")
     return camera_supis
 
 
-def _camera_info(ue_supi: str) -> CameraInfo:
+async def _camera_info(
+    ue_supi: str, qod_provisioning_interface: QoDProvisioningInterface
+) -> CameraInfo:
     area_cfg = (
         settings.cameras.get_area_by_ue_supi(ue_supi)
         or settings.cameras.default_surveyed_area
@@ -43,8 +56,11 @@ def _camera_info(ue_supi: str) -> CameraInfo:
         ue_supi=ue_supi,
         qos_profile=settings.cameras.get_by_ue_supi(ue_supi)
         or settings.cameras.default_qos_profile,
+        stream_requirements=settings.cameras.get_stream_requirements_by_ue_supi(ue_supi)
+        or settings.cameras.default_stream_requirements,
         surveyed_area=_resolve_surveyed_area(area_cfg),
         inference=settings.cameras.get_inference_config_by_ue_supi(ue_supi),
+        qos_state=await qod_provisioning_interface.get_qos_state(ue_supi),
     )
 
 

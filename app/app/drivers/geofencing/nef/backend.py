@@ -1,4 +1,5 @@
 import logging
+import time
 from datetime import datetime, timezone
 from functools import cached_property
 from ipaddress import IPv4Address
@@ -54,7 +55,6 @@ class NefGeofencingBackend(GeofencingInterface):
                 monitoringType=MonitoringType.LOCATION_REPORTING,
                 notificationDestination=AnyUrl(notification_url),
                 monitorExpireTime=_MONITOR_EXPIRE_TIME,
-                immediateRep=True,
                 msisdn=ue.msisdn,
             )
         elif ue.ip_address_v4 is not None:
@@ -62,7 +62,6 @@ class NefGeofencingBackend(GeofencingInterface):
                 monitoringType=MonitoringType.LOCATION_REPORTING,
                 notificationDestination=AnyUrl(notification_url),
                 monitorExpireTime=_MONITOR_EXPIRE_TIME,
-                immediateRep=True,
                 ipv4Addr=IPv4Address(ue.ip_address_v4),
             )
         else:
@@ -77,15 +76,29 @@ class NefGeofencingBackend(GeofencingInterface):
             api_name_filter="monitoring-event",
             operation="POST",
         ).format(scsAsId=settings.poc_af_id)
-        LOG.info(
-            "Creating NEF geofencing (location) subscription for UE supi=%s, camera supi=%s",
-            ue.supi,
-            area.camera_supi,
-        )
+        # LOG.info(
+        #     "Creating NEF geofencing (location) subscription for UE supi=%s, camera supi=%s",
+        #     ue.supi,
+        #     area.camera_supi,
+        # )
+        body = payload.model_dump_json(exclude_none=True)
+        # await asyncio.sleep(8)  # benchmark: measure from a cold http connection
+        _bench_start_ns = time.perf_counter_ns()
         res = await self._client.post(
             url,
-            content=payload.model_dump_json(exclude_none=True),
+            content=body,
             headers={"Content-Type": "application/json"},
+        )
+        _bench_elapsed_ns = time.perf_counter_ns() - _bench_start_ns
+        LOG.info(
+            'BENCHMARK: {"api": "NEF", "resource": "Create Subscription", '
+            '"filter": "monitoring-event", "op": "POST", '
+            '"x_correlator": "%s", "ue": "%s", "camera": "%s", "time_ns": %d, "status": %d}',
+            res.request.headers.get("x-correlator") or "",
+            ue.supi,
+            area.camera_supi,
+            _bench_elapsed_ns,
+            res.status_code,
         )
         if not res.is_success:
             raise RuntimeError(
@@ -107,11 +120,11 @@ class NefGeofencingBackend(GeofencingInterface):
         await self._redis.set(
             self.subscription_key(ue.supi, managed_id), managed.model_dump_json()
         )
-        LOG.info(
-            "NEF geofencing subscription created for UE supi=%s, subscriptionId=%s",
-            ue.supi,
-            managed_id,
-        )
+        # LOG.info(
+        #     "NEF geofencing subscription created for UE supi=%s, subscriptionId=%s",
+        #     ue.supi,
+        #     managed_id,
+        # )
         return [managed_id]
 
     async def delete_geofencing_subscription(
@@ -132,11 +145,11 @@ class NefGeofencingBackend(GeofencingInterface):
             api_name_filter="monitoring-event",
             operation="DELETE",
         ).format(scsAsId=settings.poc_af_id, subscriptionId=managed.nef_subscription_id)
-        LOG.info(
-            "Deleting NEF geofencing subscription id=%s (NEF subscriptionId=%s)",
-            subscription_id,
-            managed.nef_subscription_id,
-        )
+        # LOG.info(
+        #     "Deleting NEF geofencing subscription id=%s (NEF subscriptionId=%s)",
+        #     subscription_id,
+        #     managed.nef_subscription_id,
+        # )
         res = await self._client.delete(url)
         if res.status_code == 404:
             LOG.warning(

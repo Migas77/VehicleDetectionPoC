@@ -15,3 +15,15 @@ redis:
   master:
     persistence:
       size: 1Gi
+    # The "nano" preset (150m CPU limit) CFS-throttles single-threaded Redis
+    # under load - ~30% of periods throttled, adding 15-90ms to commands.
+    # Set an explicit block (preset must be "none" for it to take effect):
+    # modest request, high limit so bursts can grab a full core.
+    resourcesPreset: "none"
+    resources:
+      requests:
+        cpu: 250m
+        memory: 256Mi
+      limits:
+        cpu: "2"
+        memory: 512Mi

@@ -10,13 +10,13 @@ spec:
   source:
     repoURL: oci://ghcr.io/migas77/crash-detection-poc-umbrella
     chart: crash-detection-poc-umbrella
-    targetRevision: "0.0.17"
+    targetRevision: "0.0.18"
     helm:
       parameters:
         - name: frontend.image.tag
           value: "0.0.3"
         - name: backend.image.tag
-          value: "0.0.7"
+          value: "0.0.19"
 
         # CAPIF invoker. Enabled solely by net_apis.auth_mode = "capif" in the
         # configToml below; these values only configure it.
@@ -34,25 +34,25 @@ spec:
             
             camerasToml: |
               [cameras.qos_profiles]
-              QCI_1_voice = {qos_profile_name = "QCI_1_voice", min_ul_bitrate = "50 Kbps", max_ul_bitrate = "100 Kbps", min_dl_bitrate = "50 Kbps", max_dl_bitrate = "100 Kbps"}
-              QCI_2_voice = {qos_profile_name = "QCI_2_voice", min_ul_bitrate = "200 Kbps", max_ul_bitrate = "400 Kbps", min_dl_bitrate = "200 Kbps", max_dl_bitrate = "400 Kbps"}
+              QCI_1_voice = {qos_profile_name = "QCI_1_voice", max_ul_bitrate = "20000 Kbps", max_dl_bitrate = "20000 Kbps"}
+              QCI_2_voice = {qos_profile_name = "QCI_2_voice", max_ul_bitrate = "25000 Kbps", max_dl_bitrate = "25000 Kbps"}
               [cameras.qos_profiles_assignment]
               default              = "QCI_1_voice"
-              "202010000000006"    = "QCI_2_voice"
-              "202010000000007"    = "QCI_2_voice"
+              fallback             = "QCI_2_voice"
               [cameras.surveyed_areas]
               default              = {radius = 300}
-              "202010000000006"    = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}
-              "202010000000007"    = {radius = 200}
+              "999080100001127"    = {radius = 500, points = [{latitude = 40.63, longitude = -8.65}, {latitude = 40.64, longitude = -8.64}, {latitude = 40.63, longitude = -8.63}]}
+              [cameras.stream_requirements]
+              default              = {min_ul_bitrate = "15000 Kbps", min_dl_bitrate = "15000 Kbps"}
               [cameras.inference]
               default              = {inference_enabled = false}
-              "202010000000006"    = {inference_enabled = true, stream_protocol = "rtsp", stream_ip = "192.168.93.56", stream_port = 8554, stream_path = "mystream", max_fps = 15}
+              "999080100001127"    = {inference_enabled = true, stream_protocol = "rtsp", stream_ip = "10.16.9.25", stream_port = 8554, stream_path = "mystream", max_fps = 15}
             
             configToml: |
               log_level = "INFO"
               poc_title = "Vehicle Crash Detection PoC"
               poc_af_id = "VehicleCrashDetectionPoC"
-              poc_app_server = "10.100.0.1"
+              poc_app_server = "10.255.27.58"
               cors_allow_origins = ["http://127.0.0.1:5173", "http://localhost:5173"]
 
               [net_apis]

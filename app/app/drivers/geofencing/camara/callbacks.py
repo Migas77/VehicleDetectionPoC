@@ -18,16 +18,16 @@ async def camara_geofencing_callback(
     geofencing_interface: GeofencingInterfaceDep,
 ) -> None:
     """Receive geofencing CloudEvent notifications from the CAMARA Geofencing service."""
-    LOG.info(
-        "Received CAMARA geofencing callback for UE supi=%s, camera supi=%s: type=%s",
-        ue_supi,
-        camera_supi,
-        body.type,
-    )
+    # LOG.info(
+    #     "Received CAMARA geofencing callback for UE supi=%s, camera supi=%s: type=%s",
+    #     ue_supi,
+    #     camera_supi,
+    #     body.type,
+    # )
     data = body.data
     if isinstance(data, AreaEntered):
         await geofencing_interface.register_in_camera_area(camera_supi, ue_supi)
-        LOG.info("UE supi=%s entered camera supi=%s area", ue_supi, camera_supi)
+        # LOG.info("UE supi=%s entered camera supi=%s area", ue_supi, camera_supi)
     elif isinstance(data, AreaLeft):
         await geofencing_interface.unregister_from_camera_area(camera_supi, ue_supi)
-        LOG.info("UE supi=%s left camera supi=%s area", ue_supi, camera_supi)
+        # LOG.info("UE supi=%s left camera supi=%s area", ue_supi, camera_supi)

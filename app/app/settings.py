@@ -31,6 +31,7 @@ from app.capif import (
     NEF_CAPIF_API_NAME,
 )
 from app.schemas.camara.common import Point
+from app.schemas.nef.analytics_exposure import BitRate
 from app.schemas.qos_profile import QosProfile
 
 
@@ -47,6 +48,8 @@ class NefSettings(BaseModel):
     poc_notification_url: AnyHttpUrl
     username: str | None = None
     password: str | None = None
+    # DNN of the slice the AsSessionWithQoS subscriptions apply to (no S-NSSAI is sent)
+    qos_dnn: str = "embb"
 
 
 class CamaraSettings(BaseModel):
@@ -91,6 +94,13 @@ class SurveyedAreaConfig(BaseModel):
     points: list[Point] | None = None  # optional polygon vertices (NEF refinement)
 
 
+class StreamRequirementsConfig(BaseModel):
+    """Network requirements of the camera stream, independent of the applied QoS profile."""
+
+    min_ul_bitrate: BitRate  # analytics breach threshold (targetMinUpstreamRate)
+    min_dl_bitrate: BitRate  # analytics breach threshold (targetMinDownstreamRate)
+
+
 class CameraInferenceConfig(BaseModel):
     inference_enabled: bool = False
     stream_protocol: str | None = None
@@ -116,10 +126,15 @@ class CameraInferenceConfig(BaseModel):
 
 class CamerasSettings(BaseModel):
     qos_profiles: dict[str, QosProfile]  # {profile_name : QosProfile}
-    qos_profiles_assignment: dict[str, str]  # {"default" / ue_supi : profile_name}
+    qos_profiles_assignment: dict[
+        str, str
+    ]  # {"default" / "fallback" / ue_supi : profile_name}
     surveyed_areas: dict[
         str, SurveyedAreaConfig
     ]  # {"default" / ue_supi : SurveyedAreaConfig}
+    stream_requirements: dict[
+        str, StreamRequirementsConfig
+    ]  # {"default" / ue_supi : StreamRequirementsConfig}
     inference: dict[str, CameraInferenceConfig] = Field(
         default_factory=dict
     )  # {"default" / ue_supi : CameraInferenceConfig}
@@ -142,9 +157,23 @@ class CamerasSettings(BaseModel):
             raise ValueError("surveyed_areas must contain a 'default' key")
         return self
 
+    @model_validator(mode="after")
+    def _validate_stream_requirements(self) -> "CamerasSettings":
+        if "default" not in self.stream_requirements:
+            raise ValueError("stream_requirements must contain a 'default' key")
+        return self
+
     @property
     def default_qos_profile(self) -> QosProfile:
         return self.qos_profiles[self.qos_profiles_assignment["default"]]
+
+    @property
+    def fallback_qos_profile(self) -> QosProfile | None:
+        """Profile a camera switches to once an analytics breach is detected, if configured."""
+        name = self.qos_profiles_assignment.get("fallback")
+        if name is None:
+            return None
+        return self.qos_profiles[name]  # validator guarantees name exists
 
     def get_by_ue_supi(self, ue_supi: str) -> QosProfile | None:
         name = self.qos_profiles_assignment.get(ue_supi)
@@ -158,6 +187,15 @@ class CamerasSettings(BaseModel):
 
     def get_area_by_ue_supi(self, ue_supi: str) -> SurveyedAreaConfig | None:
         return self.surveyed_areas.get(ue_supi)
+
+    @property
+    def default_stream_requirements(self) -> StreamRequirementsConfig:
+        return self.stream_requirements["default"]  # validator guarantees presence
+
+    def get_stream_requirements_by_ue_supi(
+        self, ue_supi: str
+    ) -> StreamRequirementsConfig | None:
+        return self.stream_requirements.get(ue_supi)
 
     def get_inference_config_by_ue_supi(self, ue_supi: str) -> CameraInferenceConfig:
         return (
@@ -333,6 +371,7 @@ class Settings(BaseSettings):
         Settings validator guarantees username/password are set.
         """
         from app.drivers.nef_auth import NEFJwtAuth  # deferred — avoids circular import
+        from app.drivers.x_correlator import EVENT_HOOKS
 
         nef_url = str(self.nef.url).rstrip("/")
         auth: httpx.Auth = NEFJwtAuth(
@@ -341,7 +380,10 @@ class Settings(BaseSettings):
             self.nef.password,  # type: ignore[arg-type]
         )
         return httpx.AsyncClient(
-            base_url=nef_url, auth=auth, verify=self._get_ssl_context()
+            base_url=nef_url,
+            auth=auth,
+            verify=self._get_ssl_context(),
+            event_hooks=EVENT_HOOKS,
         )
 
     def create_nef_exposure_client(self) -> httpx.AsyncClient:
@@ -356,11 +398,13 @@ class Settings(BaseSettings):
 
         from app.capif.invoker import capif_invoker  # deferred — avoids circular import
         from app.drivers.capif_auth import CAPIFAuth
+        from app.drivers.x_correlator import EVENT_HOOKS
 
         return httpx.AsyncClient(
             base_url=capif_invoker.get_base_url(NEF_CAPIF_API_NAME),
             auth=CAPIFAuth(),
             verify=self._get_ssl_context(),
+            event_hooks=EVENT_HOOKS,
         )
 
     def create_camara_client(self) -> httpx.AsyncClient:
@@ -377,10 +421,13 @@ class Settings(BaseSettings):
                 "[camara] section is present in config.toml"
             )
 
+        from app.drivers.x_correlator import EVENT_HOOKS
+
         if self.net_apis.auth_mode != "capif":
             return httpx.AsyncClient(
                 base_url=str(self.camara.url).rstrip("/"),
                 verify=self._get_ssl_context(),
+                event_hooks=EVENT_HOOKS,
             )
 
         from app.capif.invoker import capif_invoker  # deferred — avoids circular import
@@ -390,6 +437,7 @@ class Settings(BaseSettings):
             base_url=capif_invoker.get_base_url(CAMARA_CAPIF_API_NAME),
             auth=CAPIFAuth(),
             verify=self._get_ssl_context(),
+            event_hooks=EVENT_HOOKS,
         )
 
     @property
@@ -421,3 +469,14 @@ class Settings(BaseSettings):
 settings = Settings()
 
 logging.basicConfig(level=settings.log_level)
+
+# Silence noisy HTTP client libraries so their per-request logging does not
+# interfere with benchmark timings.
+for _noisy_logger in (
+    "httpx",
+    "httpcore",
+    "httpcore.http11",
+    "httpcore.connection",
+    "uvicorn.access",
+):
+    logging.getLogger(_noisy_logger).setLevel(logging.WARNING)

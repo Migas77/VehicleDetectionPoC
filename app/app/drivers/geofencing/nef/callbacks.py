@@ -70,11 +70,11 @@ async def nef_geofencing_callback(
 
     if new_state == GeofenceState.INSIDE:
         await geofencing_interface.register_in_camera_area(camera_supi, ue_supi)
-        LOG.info("UE supi=%s entered camera supi=%s area (NEF)", ue_supi, camera_supi)
+        # LOG.info("UE supi=%s entered camera supi=%s area (NEF)", ue_supi, camera_supi)
     elif managed.last_state == GeofenceState.INSIDE:
         # genuine INSIDE -> OUTSIDE transition
         await geofencing_interface.unregister_from_camera_area(camera_supi, ue_supi)
-        LOG.info("UE supi=%s left camera supi=%s area (NEF)", ue_supi, camera_supi)
+        # LOG.info("UE supi=%s left camera supi=%s area (NEF)", ue_supi, camera_supi)
 
     managed.last_state = new_state
     await redis.set(key, managed.model_dump_json())

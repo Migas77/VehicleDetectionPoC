@@ -1,4 +1,5 @@
 import logging
+import time
 from functools import cached_property
 from ipaddress import IPv4Address
 from typing import Any
@@ -27,6 +28,7 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
     """Creates and manages an indefinite QoD provisioning in the CAMARA gateway for a camera UE."""
 
     def __init__(self) -> None:
+        super().__init__()
         self._notification_url = settings.camara_notification_url
 
     @cached_property
@@ -51,39 +53,63 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
             "neither ip_address_v4 nor msisdn is set"
         )
 
-    async def assign_qos_profile(self, ue: UeWithQoS) -> str:
+    async def _create_provisioning(self, ue: UeWithQoS) -> str:
         sink = f"{self._notification_url}/callbacks/qod-provisioning/camara/{ue.supi}"
         payload = TriggerProvisioning(
             device=self._build_device(ue),
             qosProfile=ue.qos_profile.qos_profile_name,
             sink=sink,
         )
-        LOG.info(
-            "Creating CAMARA QoD provisioning for UE supi=%s, qosProfile=%s",
-            ue.supi,
-            ue.qos_profile.qos_profile_name,
+        # LOG.info(
+        #     "Creating CAMARA QoD provisioning for UE supi=%s, qosProfile=%s",
+        #     ue.supi,
+        #     ue.qos_profile.qos_profile_name,
+        # )
+        url = discover_camara_url(
+            fallback="/qod-provisioning/v0.2/device-qos",
+            resource_name="Create Provisioning",
+            api_name_filter="qod-provisioning",
+            operation="POST",
         )
+        body = payload.model_dump_json(exclude_unset=True)
+        # await asyncio.sleep(8)  # benchmark: measure from a cold http connection
+        _bench_start_ns = time.perf_counter_ns()
         res = await self._client.post(
-            discover_camara_url(
-                fallback="/qod-provisioning/v0.2/device-qos",
-                resource_name="Create Provisioning",
-                api_name_filter="qod-provisioning",
-                operation="POST",
-            ),
-            content=payload.model_dump_json(exclude_unset=True),
+            url,
+            content=body,
             headers={"Content-Type": "application/json"},
+        )
+        _bench_elapsed_ns = time.perf_counter_ns() - _bench_start_ns
+        LOG.info(
+            'BENCHMARK: {"api": "CAMARA", "resource": "Create Provisioning", '
+            '"filter": "qod-provisioning", "op": "POST", '
+            '"x_correlator": "%s", "ue": "%s", "time_ns": %d, "status": %d}',
+            res.request.headers.get("x-correlator") or "",
+            ue.supi,
+            _bench_elapsed_ns,
+            res.status_code,
         )
         if not res.is_success:
             raise RuntimeError(
                 f"CAMARA QoD provisioning failed ({res.status_code}): {res.text}"
             )
         provisioning = ProvisioningInfo.model_validate_json(res.content)
-        LOG.info(
-            "CAMARA QoD provisioning created for UE supi=%s, provisioningId=%s",
-            ue.supi,
-            provisioning.provisioningId,
-        )
+        # LOG.info(
+        #     "CAMARA QoD provisioning created for UE supi=%s, provisioningId=%s",
+        #     ue.supi,
+        #     provisioning.provisioningId,
+        # )
         return str(provisioning.provisioningId)
+
+    async def _replace_provisioning(self, provisioning_id: str, ue: UeWithQoS) -> str:
+        """DELETE the provisioning and create a new one, as QoD Provisioning has no update.
+
+        Deleting reverts the UE's QoS, so if the new profile is rejected no profile
+        remains applied.
+        """
+        await self.delete_qod_provisioning(provisioning_id)
+        await self.clear_qos_state(ue.supi)
+        return await self.assign_qos_profile(ue)
 
     async def get_qod_provisioning(self, provisioning_id: str) -> dict[str, Any]:
         res = await self._client.get(
@@ -101,7 +127,7 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
         return _dict_adapter.validate_json(res.content)
 
     async def delete_qod_provisioning(self, provisioning_id: str) -> bool:
-        LOG.info("Deleting CAMARA QoD provisioning id=%s", provisioning_id)
+        # LOG.info("Deleting CAMARA QoD provisioning id=%s", provisioning_id)
         res = await self._client.delete(
             discover_camara_url(
                 fallback="/qod-provisioning/v0.2/device-qos/{provisioningId}",
@@ -119,7 +145,7 @@ class CamaraQoDProvisioningBackend(QoDProvisioningInterface):
             raise RuntimeError(
                 f"CAMARA QoD delete provisioning failed ({res.status_code}): {res.text}"
             )
-        LOG.info("CAMARA QoD provisioning id=%s deleted", provisioning_id)
+        # LOG.info("CAMARA QoD provisioning id=%s deleted", provisioning_id)
         return True
 
     async def retrieve_qod_provisioning_by_device(self, ue: UE) -> str | None:
