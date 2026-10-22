@@ -75,12 +75,26 @@ video-download: ## Download every file of the videos Google Drive folder into VI
 			fi; \
 		done
 
-video-info: ## Show resolution and frame rate (r_frame_rate,avg_frame_rate) of every video in VIDEOS_DIR
-	@printf "%-6s\t%-6s\t%-11s\t%-11s\t%s\n" WIDTH HEIGHT R_FPS AVG_FPS FILE; \
+# Row format shared by the video-info header and rows
+VIDEO_INFO_FMT := %-6s\t%-8s\t%-6s\t%-6s\t%-9s\t%-8s\t%-7s\t%-7s\t%-6s\t%-7s\t%-7s\t%-8s\t%s\n
+
+video-info: ## Show codec, profile, resolution, pixel format, color space, frame rate, frames, duration, bitrate and size of every video in VIDEOS_DIR
+	@printf "$(VIDEO_INFO_FMT)" CODEC PROFILE WIDTH HEIGHT PIX_FMT COLOR R_FPS AVG_FPS FRAMES DUR_S MBPS SIZE_MB FILE; \
 	for f in "$(VIDEOS_DIR)"/*.mkv "$(VIDEOS_DIR)"/*.mp4; do \
 		[ -f "$$f" ] || continue; \
-		ffprobe -v error -select_streams v:0 -show_entries stream=width,height,r_frame_rate,avg_frame_rate -of csv=p=0 "$$f" \
-			| { IFS=, read -r w h r a; printf "%-6s\t%-6s\t%-11s\t%-11s\t%s\n" "$$w" "$$h" "$$r" "$$a" "$$f"; }; \
+		ffprobe -v error -select_streams v:0 \
+			-show_entries stream=codec_name,profile,width,height,pix_fmt,color_space,r_frame_rate,avg_frame_rate,nb_frames,bit_rate:format=duration,size,bit_rate \
+			-of default "$$f" \
+			| gawk -F= -v fmt="$(VIDEO_INFO_FMT)" -v file="$$f" ' \
+				/^\[FORMAT\]/ { in_fmt = 1; next } \
+				/^\[/ { next } \
+				{ if (in_fmt) fm[$$1] = $$2; else st[$$1] = $$2 } \
+				END { \
+					br = (st["bit_rate"] ~ /^[0-9]+$$/) ? st["bit_rate"] : fm["bit_rate"]; \
+					printf fmt, st["codec_name"], st["profile"], st["width"], st["height"], st["pix_fmt"], st["color_space"], \
+						st["r_frame_rate"], st["avg_frame_rate"], st["nb_frames"], sprintf("%.2f", fm["duration"]), \
+						sprintf("%.2f", br / 1e6), sprintf("%.2f", fm["size"] / 1e6), file \
+				}'; \
 	done
 
 mediamtx-up: check-ip ## Run the MediaMTX streaming server via Docker
@@ -109,14 +123,22 @@ mediamtx-up: check-ip ## Run the MediaMTX streaming server via Docker
 mediamtx-down: ## Stop and remove the MediaMTX container
 	sudo docker rm -f mediamtx
 
-stream-publish: check-ip ## [sender] Loop VIDEO as an RTSP stream to rtsp://MEDIAMTX_IP:8554/STREAM_PATH
+stream-publish: check-ip ## [sender] Loop VIDEO as an RTSP stream to rtsp://MEDIAMTX_IP:8554/STREAM_PATH, in the same codec as VIDEO (h264 or h265)
 	@if [ ! -f "$(VIDEO)" ]; then \
 		echo "Error: video file '$(VIDEO)' not found. Run 'make video-download', set VIDEO=<path> or place it at videos/crashes.mp4."; \
 		exit 1; \
 	fi
+	@# Re-encode with the encoder matching the codec of VIDEO, so an h265 video is streamed as h265 and an h264 one as h264
+	@codec=$$(ffprobe -v error -select_streams v:0 -show_entries stream=codec_name -of csv=p=0 "$(VIDEO)"); \
+	case "$$codec" in \
+		h264) encoder=libx264 ;; \
+		hevc) encoder=libx265 ;; \
+		*) echo "Error: unsupported codec '$$codec' in $(VIDEO) (expected h264 or hevc)"; exit 1 ;; \
+	esac; \
+	echo "Publishing $(VIDEO) ($$codec) with $$encoder"; \
 	ffmpeg -re -stream_loop -1 -i $(VIDEO) \
 		-vf fps=30 \
-		-c:v libx264 -preset ultrafast -tune zerolatency -bf 0 -pix_fmt yuv420p -g 60 \
+		-c:v $$encoder -preset ultrafast -tune zerolatency -bf 0 -pix_fmt yuv420p -g 60 \
 		-c:a libopus -b:a 128k -ar 48000 \
 		-f rtsp -rtsp_transport tcp \
 		rtsp://$(MEDIAMTX_IP):8554/$(STREAM_PATH)
